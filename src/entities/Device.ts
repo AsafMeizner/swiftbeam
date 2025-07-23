@@ -24,9 +24,9 @@ export class Device {
       list = [
         {
           id: "d1",
-          name: "Shira's iPhone",
+          name: "Asaf's iPhone",
           type: "phone",
-          platform: "ios",
+          platform: "android",
           is_online: true,
           last_seen: new Date().toISOString(),
           connection_status: "available",
@@ -50,6 +50,26 @@ export class Device {
           is_online: false,
           last_seen: new Date().toISOString(),
           connection_status: "disconnected",
+          created_date: new Date().toISOString()
+        },
+        {
+          id: "d4",
+          name: "iPad Pro",
+          type: "tablet",
+          platform: "ios",
+          is_online: true,
+          last_seen: new Date().toISOString(),
+          connection_status: "disconnected",
+          created_date: new Date().toISOString()
+        },
+        {
+          id: "d5",
+          name: "Android Phone",
+          type: "phone",
+          platform: "ios",
+          is_online: true,
+          last_seen: new Date().toISOString(),
+          connection_status: "available",
           created_date: new Date().toISOString()
         }
       ];
