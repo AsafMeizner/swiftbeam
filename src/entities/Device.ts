@@ -21,7 +21,7 @@ export class Device {
     let list = await localDb.get<DeviceRecord[]>(COLLECTION, []);
     if (list.length === 0) {
       // seed
-      list = [
+      const list = [
         {
           id: "d1",
           name: "Asaf's iPhone",

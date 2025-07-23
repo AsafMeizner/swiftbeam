@@ -57,7 +57,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-gray-100 p-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center shadow-lg">
-            <Zap className="w-5 h-5 text-white" />
+            <Zap className="w-5 h-5 text-blue-500" />
           </div>
           <div>
             <h2 className="font-bold text-xl text-gradient">SwiftBeam</h2>
