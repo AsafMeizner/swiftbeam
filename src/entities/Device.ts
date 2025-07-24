@@ -21,7 +21,7 @@ export class Device {
     let list = await localDb.get<DeviceRecord[]>(COLLECTION, []);
     if (list.length === 0) {
       // seed
-      const list = [
+      const seedData: DeviceRecord[] = [
         {
           id: "d1",
           name: "Asaf's iPhone",
@@ -73,7 +73,8 @@ export class Device {
           created_date: new Date().toISOString()
         }
       ];
-      await localDb.set(COLLECTION, list);
+      await localDb.set(COLLECTION, seedData);
+      list = seedData;
     }
     if (sort === "-last_seen") {
       list.sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());

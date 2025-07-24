@@ -19,8 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { DeviceData } from "@/types";
+import { LucideIcon } from "lucide-react";
 
-const deviceIcons: Record<string, any> = {
+const deviceIcons: Record<string, LucideIcon> = {
   phone: Smartphone,
   tablet: Tablet,
   laptop: Laptop,
@@ -38,10 +40,8 @@ const platformColors: Record<string, string> = {
 };
 
 export default function DiscoveryPage() {
-  const [onlineDevicesCount, setOnlineDevicesCount] = useState(0);
-
   // Page state
-  const [devices, setDevices] = useState<any[]>([]);
+  const [devices, setDevices] = useState<DeviceData[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
@@ -55,10 +55,6 @@ export default function DiscoveryPage() {
     }, 5000);
     return () => clearInterval(interval);
   }, [isScanning]);
-
-  useEffect(() => {
-    setOnlineDevicesCount(devices.filter(d => d.is_online).length);
-  }, [devices]);
 
   const loadDevices = async () => {
     const deviceList = await Device.list("-last_seen");
@@ -183,7 +179,7 @@ export default function DiscoveryPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <AnimatePresence>
                 {onlineDevices.map((device) => {
-                  const DeviceIcon = deviceIcons[device.device_type] || deviceIcons.unknown;
+                  const DeviceIcon = deviceIcons[device.type] || deviceIcons.unknown;
                   const isSelected = selectedDevices.has(device.id);
 
                   return (
@@ -220,7 +216,6 @@ export default function DiscoveryPage() {
                                   {device.platform}
                                 </Badge>
                               </div>
-                              <p className="text-sm text-gray-600 mb-2">{device.ip_address}</p>
                               <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <Wifi className="w-3 h-3" />
                                 <span>Active now</span>
@@ -259,7 +254,7 @@ export default function DiscoveryPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {offlineDevices.map((device) => {
-                const DeviceIcon = deviceIcons[device.device_type] || deviceIcons.unknown;
+                const DeviceIcon = deviceIcons[device.type] || deviceIcons.unknown;
 
                 return (
                   <Card key={device.id} className="border-0 shadow-md bg-white/60 backdrop-blur-sm opacity-75">
@@ -279,7 +274,6 @@ export default function DiscoveryPage() {
                               {device.platform}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-500 mb-2">{device.ip_address}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-400">
                             <WifiOff className="w-3 h-3" />
                             <span>Last seen: {new Date(device.last_seen).toLocaleString()}</span>

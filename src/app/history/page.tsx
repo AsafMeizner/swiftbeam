@@ -22,9 +22,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatFileSize } from "@/utils/format";
+import { FileTransferData, SortType, TabType } from "@/types";
+import { LucideIcon } from "lucide-react";
 
 const getFileIcon = (fileType: string) => {
   if (fileType?.startsWith("image/")) return ImageIcon;
@@ -35,7 +37,7 @@ const getFileIcon = (fileType: string) => {
   return File;
 };
 
-const statusIcons: Record<string, any> = {
+const statusIcons: Record<string, LucideIcon> = {
   completed: CheckCircle2,
   failed: XCircle,
   pending: Clock,
@@ -50,19 +52,11 @@ const statusColors: Record<string, string> = {
 };
 
 export default function HistoryPage() {
-  const [transfers, setTransfers] = useState<any[]>([]);
-  const [filteredTransfers, setFilteredTransfers] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | "sent" | "received">("all");
-  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "largest" | "smallest">("newest");
+  const [transfers, setTransfers] = useState<FileTransferData[]>([]);
+  const [filteredTransfers, setFilteredTransfers] = useState<FileTransferData[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>("all");
+  const [sortBy, setSortBy] = useState<SortType>("newest");
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadTransfers();
-  }, []);
-
-  useEffect(() => {
-    filterAndSortTransfers();
-  }, [transfers, activeTab, sortBy]);
 
   const loadTransfers = async () => {
     setIsLoading(true);
@@ -71,7 +65,11 @@ export default function HistoryPage() {
     setIsLoading(false);
   };
 
-  const filterAndSortTransfers = () => {
+  useEffect(() => {
+    loadTransfers();
+  }, []);
+
+  const filterAndSortTransfers = React.useCallback(() => {
     let filtered = [...transfers];
 
     if (activeTab === "sent") {
@@ -96,7 +94,11 @@ export default function HistoryPage() {
     });
 
     setFilteredTransfers(filtered);
-  };
+  }, [transfers, activeTab, sortBy]);
+
+  useEffect(() => {
+    filterAndSortTransfers();
+  }, [filterAndSortTransfers]);
 
   const getTransferStats = () => {
     const sent = transfers.filter(t => t.sender_device === "My Device");
@@ -196,7 +198,7 @@ export default function HistoryPage() {
           <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
                   <TabsList className="bg-gray-100">
                     <TabsTrigger value="all">All Transfers</TabsTrigger>
                     <TabsTrigger value="sent">Sent</TabsTrigger>
@@ -206,7 +208,7 @@ export default function HistoryPage() {
 
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortType)}>
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Sort" />
                     </SelectTrigger>

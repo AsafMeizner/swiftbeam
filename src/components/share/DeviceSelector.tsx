@@ -16,8 +16,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DeviceData } from "@/types";
+import { LucideIcon } from "lucide-react";
 
-const deviceIcons: Record<string, any> = {
+const deviceIcons: Record<string, LucideIcon> = {
   phone: Smartphone,
   tablet: Tablet,
   laptop: Laptop,
@@ -26,12 +28,12 @@ const deviceIcons: Record<string, any> = {
 };
 
 type Props = {
-  selectedDevice: any;
-  onDeviceSelect: (device: any) => void;
+  selectedDevice: DeviceData | null;
+  onDeviceSelect: (device: DeviceData) => void;
 };
 
 export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props) {
-  const [devices, setDevices] = useState<any[]>([]);
+  const [devices, setDevices] = useState<DeviceData[]>([]);
   const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {

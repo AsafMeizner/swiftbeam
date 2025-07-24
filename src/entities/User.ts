@@ -6,7 +6,7 @@ export interface UserRecord {
   email: string;
   role: string;
   created_date: string;
-  settings?: any;
+  settings?: Record<string, unknown>;
 }
 
 const COLLECTION = "user_me";

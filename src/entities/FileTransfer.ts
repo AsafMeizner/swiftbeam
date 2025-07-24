@@ -18,7 +18,7 @@ const COLLECTION = "file_transfers";
 
 export class FileTransfer {
   static async list(sort?: "-created_date"): Promise<FileTransferRecord[]> {
-    let list = await localDb.get<FileTransferRecord[]>(COLLECTION, []);
+    const list = await localDb.get<FileTransferRecord[]>(COLLECTION, []);
     if (sort === "-created_date") {
       list.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
     }

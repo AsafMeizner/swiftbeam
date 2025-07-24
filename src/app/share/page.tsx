@@ -5,7 +5,6 @@ import { FileTransfer } from "@/entities/FileTransfer";
 import { UploadFile } from "@/integrations/Core";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Upload,
   File,
   Image as ImageIcon,
   Video,
@@ -25,12 +24,13 @@ import FileDropZone from "@/components/share/FileDropZone";
 import DeviceSelector from "@/components/share/DeviceSelector";
 import TransferProgress from "@/components/share/TransferProgress";
 import { formatFileSize } from "@/utils/format";
+import { FileData, DeviceData, FileTransferData } from "@/types";
 
 export default function SharePage() {
-  const [files, setFiles] = useState<any[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<any>(null);
+  const [files, setFiles] = useState<FileData[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<DeviceData | null>(null);
   const [transferring, setTransferring] = useState(false);
-  const [transfers, setTransfers] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<FileTransferData[]>([]);
   const [dragActive, setDragActive] = useState(false);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -54,13 +54,14 @@ export default function SharePage() {
   };
 
   const addFiles = (newFiles: File[]) => {
-    const fileObjects = newFiles.map(file => ({
+    const fileObjects: FileData[] = newFiles.map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
       name: file.name,
       size: file.size,
       type: file.type,
-      status: "ready" as "ready" | "transferring" | "completed" | "failed"
+      lastModified: file.lastModified,
+      status: "ready"
     }));
     setFiles(prev => [...prev, ...fileObjects]);
   };
@@ -89,7 +90,7 @@ export default function SharePage() {
         setFiles(prev => prev.map(f => (f.id === fileObj.id ? { ...f, status: "transferring" } : f)));
 
         // Upload file
-        const { file_url } = await UploadFile({ file: fileObj.file });
+        const { file_url } = await UploadFile({ file: fileObj.file! });
 
         // Create transfer record
         const transferRecord = await FileTransfer.create({

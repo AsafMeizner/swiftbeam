@@ -7,9 +7,10 @@ import { CheckCircle2, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatFileSize } from "@/utils/format";
+import { FileTransferData } from "@/types";
 
 type Props = {
-  transfers: any[];
+  transfers: FileTransferData[];
 };
 
 export default function TransferProgress({ transfers }: Props) {

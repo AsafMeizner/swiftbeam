@@ -19,7 +19,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Wifi,
   Zap,
-  Monitor,
   Users,
   Smartphone,
   Settings,
