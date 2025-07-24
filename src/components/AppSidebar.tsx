@@ -120,9 +120,9 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t border-gray-100 p-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
-            <Smartphone className="w-4 h-4 text-white" />
-          </div>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+            <Smartphone className="w-5 h-5 text-white" />
+            </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm truncate" style={{ color: "var(--swift-gray-900)" }}>
               My Device
