@@ -28,7 +28,7 @@ import { FileData, DeviceData, FileTransferData } from "@/types";
 
 export default function SharePage() {
   const [files, setFiles] = useState<FileData[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<DeviceData | null>(null);
+  const [selectedDevices, setSelectedDevices] = useState<DeviceData[]>([]);
   const [transferring, setTransferring] = useState(false);
   const [transfers, setTransfers] = useState<FileTransferData[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -80,7 +80,7 @@ export default function SharePage() {
   };
 
   const startTransfer = async () => {
-    if (!selectedDevice || files.length === 0) return;
+    if (selectedDevices.length === 0 || files.length === 0) return;
 
     setTransferring(true);
 
@@ -92,23 +92,25 @@ export default function SharePage() {
         // Upload file
         const { file_url } = await UploadFile({ file: fileObj.file! });
 
-        // Create transfer record
-        const transferRecord = await FileTransfer.create({
-          filename: fileObj.name,
-          file_size: fileObj.size,
-          file_type: fileObj.type,
-          file_url,
-          sender_device: "My Device",
-          recipient_device: selectedDevice.name,
-          transfer_status: "completed",
-          transfer_speed: Math.random() * 50 + 10,
-          completion_time: new Date().toISOString()
-        });
+        // Create transfer record for each selected device
+        for (const device of selectedDevices) {
+          const transferRecord = await FileTransfer.create({
+            filename: fileObj.name,
+            file_size: fileObj.size,
+            file_type: fileObj.type,
+            file_url,
+            sender_device: "My Device",
+            recipient_device: device.name,
+            transfer_status: "completed",
+            transfer_speed: Math.random() * 50 + 10,
+            completion_time: new Date().toISOString()
+          });
+
+          setTransfers(prev => [transferRecord, ...prev]);
+        }
 
         // Update to completed
         setFiles(prev => prev.map(f => (f.id === fileObj.id ? { ...f, status: "completed" } : f)));
-
-        setTransfers(prev => [transferRecord, ...prev]);
 
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
@@ -227,7 +229,7 @@ export default function SharePage() {
           {/* Device + control */}
           <div className="space-y-6">
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-              <DeviceSelector selectedDevice={selectedDevice} onDeviceSelect={setSelectedDevice} />
+              <DeviceSelector selectedDevices={selectedDevices} onDeviceSelect={setSelectedDevices} />
             </motion.div>
 
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
@@ -238,14 +240,19 @@ export default function SharePage() {
                   <div className="space-y-4">
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       {files.length} file{files.length !== 1 ? "s" : ""} ready
-                      {selectedDevice && (
-                        <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">→ {selectedDevice.name}</div>
+                      {selectedDevices.length > 0 && (
+                        <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+                          → {selectedDevices.length} device{selectedDevices.length !== 1 ? "s" : ""} selected
+                          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {selectedDevices.map(device => device.name).join(", ")}
+                          </div>
+                        </div>
                       )}
                     </div>
 
                     <Button
                       onClick={startTransfer}
-                      disabled={!selectedDevice || files.length === 0 || transferring}
+                      disabled={selectedDevices.length === 0 || files.length === 0 || transferring}
                       className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-200"
                       size="lg"
                     >

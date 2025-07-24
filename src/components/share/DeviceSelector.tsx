@@ -28,11 +28,11 @@ const deviceIcons: Record<string, LucideIcon> = {
 };
 
 type Props = {
-  selectedDevice: DeviceData | null;
-  onDeviceSelect: (device: DeviceData) => void;
+  selectedDevices: DeviceData[];
+  onDeviceSelect: (devices: DeviceData[]) => void;
 };
 
-export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props) {
+export default function DeviceSelector({ selectedDevices, onDeviceSelect }: Props) {
   const [devices, setDevices] = useState<DeviceData[]>([]);
   const [isScanning, setIsScanning] = useState(false);
 
@@ -53,6 +53,17 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
     }, 1500);
   };
 
+  const toggleDeviceSelection = (device: DeviceData) => {
+    const isSelected = selectedDevices.some(d => d.id === device.id);
+    if (isSelected) {
+      // Remove device from selection
+      onDeviceSelect(selectedDevices.filter(d => d.id !== device.id));
+    } else {
+      // Add device to selection
+      onDeviceSelect([...selectedDevices, device]);
+    }
+  };
+
   const onlineDevices = devices.filter(d => d.is_online);
 
   return (
@@ -61,17 +72,35 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Wifi className="w-5 h-5 text-green-600 dark:text-green-400" />
-            Select Device
+            Select Devices ({selectedDevices.length})
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={scanForDevices}
-            disabled={isScanning}
-            className="hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            <RefreshCw className={`w-4 h-4 ${isScanning ? "animate-spin" : ""}`} />
-          </Button>
+          <div className="flex gap-2">
+            {onlineDevices.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (selectedDevices.length === onlineDevices.length) {
+                    onDeviceSelect([]);
+                  } else {
+                    onDeviceSelect(onlineDevices);
+                  }
+                }}
+                className="text-xs"
+              >
+                {selectedDevices.length === onlineDevices.length ? "Clear" : "Select All"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={scanForDevices}
+              disabled={isScanning}
+              className="hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <RefreshCw className={`w-4 h-4 ${isScanning ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -89,7 +118,7 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
           <div className="space-y-3">
             {onlineDevices.map((device) => {
               const DeviceIcon = deviceIcons[device.type];
-              const isSelected = selectedDevice?.id === device.id;
+              const isSelected = selectedDevices.some(d => d.id === device.id);
 
               return (
                 <motion.div
@@ -99,7 +128,7 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
                   className={`cursor-pointer transition-all duration-200 ${
                     isSelected ? "ring-2 ring-green-500 ring-offset-2" : ""
                   }`}
-                  onClick={() => onDeviceSelect(device)}
+                  onClick={() => toggleDeviceSelection(device)}
                 >
                   <div
                     className={`p-4 rounded-xl border transition-all duration-200 ${
