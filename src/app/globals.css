@@ -158,6 +158,24 @@
   border: 1px solid rgba(75, 85, 99, 0.2);
 }
 
+.page-background {
+  background: linear-gradient(135deg, rgb(249, 250, 251) 0%, rgba(243, 244, 246, 0.5) 100%);
+}
+
+.dark .page-background {
+  background: linear-gradient(135deg, rgb(17, 24, 39) 0%, rgba(31, 41, 55, 0.5) 100%);
+}
+
+.card-background {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+}
+
+.dark .card-background {
+  background: rgba(31, 41, 55, 0.9);
+  backdrop-filter: blur(12px);
+}
+
 .gradient-bg {
   background: linear-gradient(135deg, var(--swift-blue) 0%, #0052a3 100%);
 }

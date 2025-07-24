@@ -15,7 +15,7 @@ type Props = {
 
 export default function TransferProgress({ transfers }: Props) {
   return (
-    <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+    <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-blue-600" />

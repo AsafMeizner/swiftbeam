@@ -94,7 +94,7 @@ export default function DiscoveryPage() {
   const offlineDevices = filteredDevices.filter(d => !d.is_online);
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
@@ -131,7 +131,7 @@ export default function DiscoveryPage() {
           transition={{ delay: 0.1 }}
           className="mb-8"
         >
-          <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
@@ -257,7 +257,7 @@ export default function DiscoveryPage() {
                 const DeviceIcon = deviceIcons[device.type] || deviceIcons.unknown;
 
                 return (
-                  <Card key={device.id} className="border-0 shadow-md bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm opacity-75">
+                  <Card key={device.id} className="border-0 shadow-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm opacity-75">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-4">
                         <div className="relative">
