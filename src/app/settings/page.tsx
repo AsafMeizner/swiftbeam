@@ -10,7 +10,8 @@ import {
   Shield,
   Bell,
   Save,
-  RefreshCw
+  RefreshCw,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -58,6 +60,8 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       await User.updateMyUserData({ settings });
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000); // Show "Saved!" for 2 seconds
     } catch (error) {
       console.error("Error saving settings:", error);
     }
@@ -290,7 +294,11 @@ export default function SettingsPage() {
               <Button
                 onClick={saveSettings}
                 disabled={isSaving}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                className={`shadow-lg hover:shadow-xl transition-all duration-200 ${
+                  justSaved 
+                    ? "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700" 
+                    : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                }`}
                 size="lg"
               >
                 {isSaving ? (
@@ -298,6 +306,15 @@ export default function SettingsPage() {
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                     Saving...
                   </>
+                ) : justSaved ? (
+                  <motion.div
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="flex items-center"
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Saved!
+                  </motion.div>
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
