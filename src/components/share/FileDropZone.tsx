@@ -23,8 +23,8 @@ export default function FileDropZone({ onDrop, onDrag, onFileSelect, dragActive,
     <Card
       className={`border-0 shadow-lg transition-all duration-300 ${
         dragActive
-          ? "shadow-2xl ring-4 ring-green-500/20 bg-gradient-to-br from-green-50 to-blue-50"
-          : "bg-white/90 backdrop-blur-sm hover:shadow-xl"
+          ? "shadow-2xl ring-4 ring-green-500/20 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30"
+          : "bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:shadow-xl"
       } ${disabled ? "opacity-50" : ""}`}
     >
       <CardContent className="p-8">
@@ -32,7 +32,7 @@ export default function FileDropZone({ onDrop, onDrag, onFileSelect, dragActive,
           animate={dragActive ? { scale: 1.02 } : { scale: 1 }}
           transition={{ duration: 0.2 }}
           className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 ${
-            dragActive ? "border-green-400 bg-green-50/50" : "border-gray-200 hover:border-gray-300"
+            dragActive ? "border-green-400 bg-green-50/50 dark:bg-green-950/50" : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
           }`}
           onDragEnter={onDrag}
           onDragLeave={onDrag}
@@ -53,12 +53,12 @@ export default function FileDropZone({ onDrop, onDrag, onFileSelect, dragActive,
             <div>
               <h3
                 className={`text-2xl font-bold mb-2 transition-colors duration-300 ${
-                  dragActive ? "text-green-700" : "text-gray-900"
+                  dragActive ? "text-green-700 dark:text-green-400" : "text-gray-900 dark:text-gray-100"
                 }`}
               >
                 {dragActive ? "Drop files here!" : "Share files instantly"}
               </h3>
-              <p className="text-gray-600 text-lg mb-6">
+              <p className="text-gray-600 dark:text-gray-400 text-lg mb-6">
                 {dragActive ? "Release to add files to your sharing queue" : "Drag & drop files here or click to browse"}
               </p>
 
@@ -77,11 +77,11 @@ export default function FileDropZone({ onDrop, onDrag, onFileSelect, dragActive,
               </Button>
             </div>
 
-            <div className="flex flex-wrap gap-2 justify-center text-xs text-gray-500">
-              <span className="px-2 py-1 bg-gray-100 rounded-full">Photos</span>
-              <span className="px-2 py-1 bg-gray-100 rounded-full">Videos</span>
-              <span className="px-2 py-1 bg-gray-100 rounded-full">Documents</span>
-              <span className="px-2 py-1 bg-gray-100 rounded-full">Any file type</span>
+            <div className="flex flex-wrap gap-2 justify-center text-xs text-gray-500 dark:text-gray-400">
+              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">Photos</span>
+              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">Videos</span>
+              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">Documents</span>
+              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">Any file type</span>
             </div>
           </motion.div>
         </motion.div>

@@ -76,6 +76,19 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  
+  /* SwiftBeam custom colors - Light mode */
+  --swift-blue: #0066CC;
+  --swift-gray-50: #f9fafb;
+  --swift-gray-100: #f3f4f6;
+  --swift-gray-200: #e5e7eb;
+  --swift-gray-300: #d1d5db;
+  --swift-gray-400: #9ca3af;
+  --swift-gray-500: #6b7280;
+  --swift-gray-600: #4b5563;
+  --swift-gray-700: #374151;
+  --swift-gray-800: #1f2937;
+  --swift-gray-900: #111827;
 }
 
 .dark {
@@ -110,6 +123,19 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  
+  /* SwiftBeam custom colors - Dark mode */
+  --swift-blue: #4285f4;
+  --swift-gray-50: #0f1419;
+  --swift-gray-100: #1f2937;
+  --swift-gray-200: #374151;
+  --swift-gray-300: #4b5563;
+  --swift-gray-400: #6b7280;
+  --swift-gray-500: #9ca3af;
+  --swift-gray-600: #d1d5db;
+  --swift-gray-700: #e5e7eb;
+  --swift-gray-800: #f3f4f6;
+  --swift-gray-900: #f9fafb;
 }
 
 @layer base {
@@ -127,12 +153,28 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.dark .glass-effect {
+  background: rgba(31, 41, 55, 0.9);
+  border: 1px solid rgba(75, 85, 99, 0.2);
+}
+
 .gradient-bg {
   background: linear-gradient(135deg, var(--swift-blue) 0%, #0052a3 100%);
 }
 
+.dark .gradient-bg {
+  background: linear-gradient(135deg, var(--swift-blue) 0%, #3B82F6 100%);
+}
+
 .text-gradient {
   background: linear-gradient(135deg, #0066CC, #00C2CB);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dark .text-gradient {
+  background: linear-gradient(135deg, #4285f4, #34D399);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -144,4 +186,8 @@
 .hover-lift:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 25px rgba(0, 102, 204, 0.15);
+}
+
+.dark .hover-lift:hover {
+  box-shadow: 0 8px 25px rgba(66, 133, 244, 0.25);
 }

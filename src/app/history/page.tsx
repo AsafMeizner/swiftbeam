@@ -116,12 +116,12 @@ export default function HistoryPage() {
   const stats = getTransferStats();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 dark:from-gray-900 dark:to-purple-950/30 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Transfer History</h1>
-          <p className="text-gray-600 text-lg">Track all your file sharing activity</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">Transfer History</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">Track all your file sharing activity</p>
         </motion.div>
 
         {/* Stats */}
@@ -131,57 +131,57 @@ export default function HistoryPage() {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
         >
-          <Card className="border-0 shadow-md bg-white/90 backdrop-blur-sm">
+          <Card className="border-0 shadow-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                   <File className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                  <p className="text-sm text-gray-600">Total Transfers</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Transfers</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md bg-white/90 backdrop-blur-sm">
+          <Card className="border-0 shadow-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
           <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                   <ArrowUpRight className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.sent}</p>
-                  <p className="text-sm text-gray-600">Files Sent</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.sent}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Files Sent</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md bg-white/90 backdrop-blur-sm">
+          <Card className="border-0 shadow-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <ArrowDownLeft className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.received}</p>
-                  <p className="text-sm text-gray-600">Files Received</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.received}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Files Received</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md bg-white/90 backdrop-blur-sm">
+          <Card className="border-0 shadow-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
                   <Archive className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{formatFileSize(stats.totalSize)}</p>
-                  <p className="text-sm text-gray-600">Data Transferred</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatFileSize(stats.totalSize)}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Data Transferred</p>
                 </div>
               </div>
             </CardContent>
@@ -195,11 +195,11 @@ export default function HistoryPage() {
           transition={{ delay: 0.2 }}
           className="mb-8"
         >
-          <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-                  <TabsList className="bg-gray-100">
+                  <TabsList className="bg-gray-100 dark:bg-gray-700">
                     <TabsTrigger value="all">All Transfers</TabsTrigger>
                     <TabsTrigger value="sent">Sent</TabsTrigger>
                     <TabsTrigger value="received">Received</TabsTrigger>
@@ -207,7 +207,7 @@ export default function HistoryPage() {
                 </Tabs>
 
                 <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-gray-500" />
+                  <Filter className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortType)}>
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Sort" />
@@ -227,21 +227,21 @@ export default function HistoryPage() {
 
         {/* List */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="space-y-4">
                 {isLoading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-gray-600 mt-2">Loading transfers...</p>
+                    <p className="text-gray-600 dark:text-gray-400 mt-2">Loading transfers...</p>
                   </div>
                 ) : filteredTransfers.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Clock className="w-8 h-8 text-gray-400" />
+                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Clock className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No transfers found</h3>
-                    <p className="text-gray-600">Start sharing files to see your transfer history here.</p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No transfers found</h3>
+                    <p className="text-gray-600 dark:text-gray-400">Start sharing files to see your transfer history here.</p>
                   </div>
                 ) : (
                   filteredTransfers.map((transfer) => {
@@ -255,7 +255,7 @@ export default function HistoryPage() {
                         layout
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors duration-200"
+                        className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200"
                       >
                         <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                           <FileIcon className="w-6 h-6 text-white" />
@@ -263,14 +263,14 @@ export default function HistoryPage() {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="font-medium text-gray-900 truncate">{transfer.filename}</p>
+                            <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{transfer.filename}</p>
                             {isSent ? (
-                              <ArrowUpRight className="w-4 h-4 text-green-600" />
+                              <ArrowUpRight className="w-4 h-4 text-green-600 dark:text-green-400" />
                             ) : (
-                              <ArrowDownLeft className="w-4 h-4 text-blue-600" />
+                              <ArrowDownLeft className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             )}
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                             <span>{formatFileSize(transfer.file_size)}</span>
                             <span>
                               {isSent ? `→ ${transfer.recipient_device}` : `← ${transfer.sender_device}`}
@@ -290,7 +290,7 @@ export default function HistoryPage() {
                               variant="ghost"
                               size="icon"
                               asChild
-                              className="hover:bg-blue-100 hover:text-blue-600"
+                              className="hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-600 dark:hover:text-blue-400"
                             >
                               <a href={transfer.file_url} target="_blank" rel="noopener noreferrer">
                                 <Download className="w-4 h-4" />

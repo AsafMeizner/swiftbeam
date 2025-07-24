@@ -56,11 +56,11 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
   const onlineDevices = devices.filter(d => d.is_online);
 
   return (
-    <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+    <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Wifi className="w-5 h-5 text-green-600" />
+            <Wifi className="w-5 h-5 text-green-600 dark:text-green-400" />
             Select Device
           </CardTitle>
           <Button
@@ -68,7 +68,7 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
             size="icon"
             onClick={scanForDevices}
             disabled={isScanning}
-            className="hover:bg-gray-100"
+            className="hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             <RefreshCw className={`w-4 h-4 ${isScanning ? "animate-spin" : ""}`} />
           </Button>
@@ -77,10 +77,10 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
       <CardContent>
         {onlineDevices.length === 0 ? (
           <div className="text-center py-8">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <WifiOff className="w-6 h-6 text-gray-400" />
+            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+              <WifiOff className="w-6 h-6 text-gray-400 dark:text-gray-500" />
             </div>
-            <p className="text-gray-600 text-sm">No devices available</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">No devices available</p>
             <Button variant="outline" size="sm" onClick={scanForDevices} className="mt-2">
               Scan Again
             </Button>
@@ -103,7 +103,9 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
                 >
                   <div
                     className={`p-4 rounded-xl border transition-all duration-200 ${
-                      isSelected ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                      isSelected 
+                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-600" 
+                        : "bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -118,13 +120,13 @@ export default function DeviceSelector({ selectedDevice, onDeviceSelect }: Props
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{device.name}</p>
+                        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{device.name}</p>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-600">
                             {device.platform?.toUpperCase()}
                           </Badge>
-                          <div className="flex items-center gap-1 text-green-600 text-xs">
-                            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                          <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-xs">
+                            <div className="w-1.5 h-1.5 bg-green-400 dark:bg-green-500 rounded-full animate-pulse"></div>
                             <span>Online</span>
                           </div>
                         </div>

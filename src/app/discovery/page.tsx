@@ -100,14 +100,14 @@ export default function DiscoveryPage() {
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Device Discovery</h1>
-              <p className="text-gray-600 text-lg">Find and connect to nearby devices instantly</p>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">Device Discovery</h1>
+              <p className="text-gray-600 dark:text-gray-400 text-lg">Find and connect to nearby devices instantly</p>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border">
+              <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-full shadow-sm border dark:border-gray-700">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {onlineDevices.length} devices online
                 </span>
               </div>
@@ -131,23 +131,23 @@ export default function DiscoveryPage() {
           transition={{ delay: 0.1 }}
           className="mb-8"
         >
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                   <Input
                     type="text"
                     placeholder="Search devices..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-white border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="pl-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
                 <Button
                   variant="outline"
-                  className="border-gray-200 hover:bg-gray-50"
+                  className="border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
                   onClick={() => {
                     if (selectedDevices.size > 0) {
                       setSelectedDevices(new Set());
@@ -171,7 +171,7 @@ export default function DiscoveryPage() {
           >
             <div className="flex items-center gap-2 mb-4">
               <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 Available Now ({onlineDevices.length})
               </h2>
             </div>
@@ -195,19 +195,19 @@ export default function DiscoveryPage() {
                       }`}
                       onClick={() => toggleDeviceSelection(device.id)}
                     >
-                      <Card className="border-0 shadow-md hover:shadow-lg bg-white/90 backdrop-blur-sm overflow-hidden">
+                      <Card className="border-0 shadow-md hover:shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm overflow-hidden">
                         <CardContent className="p-6">
                           <div className="flex items-center gap-4">
                             <div className="relative">
                               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                                 <DeviceIcon className="w-6 h-6 text-white" />
                               </div>
-                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white dark:border-gray-800 animate-pulse"></div>
                             </div>
 
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-semibold text-gray-900 truncate">{device.name}</h3>
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{device.name}</h3>
                                 <Badge
                                   className={`text-xs px-2 py-1 ${
                                     platformColors[device.platform] || "bg-gray-600 text-white"
@@ -216,7 +216,7 @@ export default function DiscoveryPage() {
                                   {device.platform}
                                 </Badge>
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                                 <Wifi className="w-3 h-3" />
                                 <span>Active now</span>
                               </div>
@@ -247,7 +247,7 @@ export default function DiscoveryPage() {
           >
             <div className="flex items-center gap-2 mb-4">
               <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 Recently Seen ({offlineDevices.length})
               </h2>
             </div>
@@ -257,24 +257,24 @@ export default function DiscoveryPage() {
                 const DeviceIcon = deviceIcons[device.type] || deviceIcons.unknown;
 
                 return (
-                  <Card key={device.id} className="border-0 shadow-md bg-white/60 backdrop-blur-sm opacity-75">
+                  <Card key={device.id} className="border-0 shadow-md bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm opacity-75">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-4">
                         <div className="relative">
                           <div className="w-12 h-12 bg-gray-400 rounded-lg flex items-center justify-center">
                             <DeviceIcon className="w-6 h-6 text-white" />
                           </div>
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-gray-300 rounded-full border-2 border-white"></div>
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-gray-300 rounded-full border-2 border-white dark:border-gray-800"></div>
                         </div>
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-gray-700 truncate">{device.name}</h3>
+                            <h3 className="font-semibold text-gray-700 dark:text-gray-300 truncate">{device.name}</h3>
                             <Badge variant="outline" className="text-xs">
                               {device.platform}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
                             <WifiOff className="w-3 h-3" />
                             <span>Last seen: {new Date(device.last_seen).toLocaleString()}</span>
                           </div>
@@ -291,11 +291,11 @@ export default function DiscoveryPage() {
         {/* Empty State */}
         {filteredDevices.length === 0 && !isScanning && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Users className="w-12 h-12 text-gray-400" />
+            <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Users className="w-12 h-12 text-gray-400 dark:text-gray-500" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No devices found</h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No devices found</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
               Make sure nearby devices are running SwiftBeam and connected to the same network.
             </p>
             <Button onClick={startScan} className="bg-blue-600 hover:bg-blue-700">

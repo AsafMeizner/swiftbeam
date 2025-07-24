@@ -53,14 +53,14 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r-0 shadow-sm glass-effect hidden md:flex">
-      <SidebarHeader className="border-b border-gray-100 p-6">
+      <SidebarHeader className="border-b border-gray-100 dark:border-gray-800 p-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center shadow-lg">
-            <Zap className="w-5 h-5 text-blue-500" />
+            <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
             <h2 className="font-bold text-xl text-gradient">SwiftBeam</h2>
-            <p className="text-xs" style={{ color: "var(--swift-gray-400)" }}>
+            <p className="text-xs text-muted-foreground">
               Fast, private sharing
             </p>
           </div>
@@ -69,12 +69,12 @@ export function AppSidebar() {
 
       <SidebarContent className="p-3">
         {/* Status Card */}
-        <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-green-50 to-blue-50 border border-green-100">
+        <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30 border border-green-100 dark:border-green-800/30">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-green-700">Device Online</span>
+            <span className="text-sm font-medium text-green-700 dark:text-green-400">Device Online</span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
+          <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
             <Users className="w-3 h-3" />
             <span>{onlineDevicesCount} devices nearby</span>
           </div>
@@ -82,8 +82,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel
-            className="text-xs font-semibold uppercase tracking-wider mb-3"
-            style={{ color: "var(--swift-gray-400)" }}
+            className="text-xs font-semibold uppercase tracking-wider mb-3 text-muted-foreground"
           >
             Navigation
           </SidebarGroupLabel>
@@ -95,19 +94,19 @@ export function AppSidebar() {
                     asChild
                     className={`hover-lift rounded-xl mb-1 transition-all duration-200 ${
                       pathname === item.url
-                        ? "bg-blue-50 text-blue-700 border border-blue-100 shadow-sm"
-                        : "hover:bg-white hover:shadow-sm"
+                        ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800/30 shadow-sm"
+                        : "hover:bg-white dark:hover:bg-gray-800/50 hover:shadow-sm"
                     }`}
                   >
                     <Link href={item.url} className="flex items-center gap-3 px-4 py-3">
                       <item.icon
                         className={`w-4 h-4 ${
-                          pathname === item.url ? "text-blue-600" : "text-gray-500"
+                          pathname === item.url ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"
                         }`}
                       />
                       <div className="flex-1">
                         <span className="font-medium text-sm">{item.title}</span>
-                        <p className="text-xs text-gray-500">{item.description}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{item.description}</p>
                       </div>
                     </Link>
                   </SidebarMenuButton>
@@ -118,20 +117,20 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-gray-100 p-4">
+      <SidebarFooter className="border-t border-gray-100 dark:border-gray-800 p-4">
         <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
             <Smartphone className="w-5 h-5 text-white" />
             </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm truncate" style={{ color: "var(--swift-gray-900)" }}>
+            <p className="font-medium text-sm truncate text-foreground">
               My Device
             </p>
-            <p className="text-xs truncate" style={{ color: "var(--swift-gray-400)" }}>
+            <p className="text-xs truncate text-muted-foreground">
               Ready to share
             </p>
           </div>
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/30">
             Online
           </Badge>
         </div>
