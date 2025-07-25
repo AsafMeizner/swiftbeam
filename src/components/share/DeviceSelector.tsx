@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Device } from "@/entities/Device";
+import { getDeviceDiscoveryService } from "@/services/deviceDiscovery";
 import { motion } from "framer-motion";
 import {
   Smartphone,
@@ -35,22 +35,31 @@ type Props = {
 export default function DeviceSelector({ selectedDevices, onDeviceSelect }: Props) {
   const [devices, setDevices] = useState<DeviceData[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const deviceDiscovery = getDeviceDiscoveryService();
 
   useEffect(() => {
     loadDevices();
-  }, []);
+    
+    // Set up scan status callback
+    const handleScanStatusChange = () => {
+      setIsScanning(deviceDiscovery.isCurrentlyScanning());
+    };
+    
+    deviceDiscovery.onScanStatusChange(handleScanStatusChange);
+    
+    return () => {
+      deviceDiscovery.removeScanStatusCallback(handleScanStatusChange);
+    };
+  }, [deviceDiscovery]);
 
   const loadDevices = async () => {
-    const list = await Device.list("-last_seen");
+    const list = await deviceDiscovery.getAllDevices("-last_seen");
     setDevices(list);
   };
 
   const scanForDevices = async () => {
-    setIsScanning(true);
-    setTimeout(() => {
-      setIsScanning(false);
-      loadDevices();
-    }, 1500);
+    await deviceDiscovery.startScan(1500);
+    await loadDevices();
   };
 
   const toggleDeviceSelection = (device: DeviceData) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Device } from "@/entities/Device";
+import { getDeviceDiscoveryService } from "@/services/deviceDiscovery";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Smartphone,
@@ -46,18 +46,33 @@ export default function DiscoveryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
 
+  const deviceDiscovery = getDeviceDiscoveryService();
+
   useEffect(() => {
     loadDevices();
+    
+    // Set up scan status monitoring
+    const handleScanStatusChange = () => {
+      setIsScanning(deviceDiscovery.isCurrentlyScanning());
+    };
+    
+    deviceDiscovery.onScanStatusChange(handleScanStatusChange);
+    
+    // Periodic device updates (simulate device status changes)
     const interval = setInterval(() => {
-      if (!isScanning) {
+      if (!deviceDiscovery.isCurrentlyScanning()) {
         simulateDeviceUpdate();
       }
     }, 5000);
-    return () => clearInterval(interval);
-  }, [isScanning]);
+    
+    return () => {
+      clearInterval(interval);
+      deviceDiscovery.removeScanStatusCallback(handleScanStatusChange);
+    };
+  }, [deviceDiscovery]);
 
   const loadDevices = async () => {
-    const deviceList = await Device.list("-last_seen");
+    const deviceList = await deviceDiscovery.getAllDevices("-last_seen");
     setDevices(deviceList);
   };
 
@@ -72,11 +87,8 @@ export default function DiscoveryPage() {
   };
 
   const startScan = async () => {
-    setIsScanning(true);
-    setTimeout(() => {
-      setIsScanning(false);
-      loadDevices();
-    }, 2000);
+    await deviceDiscovery.startScan(2000);
+    await loadDevices();
   };
 
   const toggleDeviceSelection = (deviceId: string) => {
@@ -86,9 +98,7 @@ export default function DiscoveryPage() {
     setSelectedDevices(newSelection);
   };
 
-  const filteredDevices = devices.filter(device =>
-    device.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDevices = deviceDiscovery.filterDevices(searchTerm, devices);
 
   const onlineDevices = filteredDevices.filter(d => d.is_online);
   const offlineDevices = filteredDevices.filter(d => !d.is_online);

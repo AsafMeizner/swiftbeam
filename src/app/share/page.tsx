@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { FileTransfer } from "@/entities/FileTransfer";
-import { UploadFile } from "@/integrations/Core";
+import { sendFilesToDevices, getFileTransferService, type TransferProgress } from "@/services/fileTransfer";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   File,
@@ -22,7 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import FileDropZone from "@/components/share/FileDropZone";
 import DeviceSelector from "@/components/share/DeviceSelector";
-import TransferProgress from "@/components/share/TransferProgress";
+import TransferProgressComponent from "@/components/share/TransferProgress";
 import { formatFileSize } from "@/utils/format";
 import { FileData, DeviceData, FileTransferData } from "@/types";
 
@@ -32,6 +31,9 @@ export default function SharePage() {
   const [transferring, setTransferring] = useState(false);
   const [transfers, setTransfers] = useState<FileTransferData[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [transferProgresses, setTransferProgresses] = useState<Map<string, TransferProgress>>(new Map());
+
+  const transferService = getFileTransferService();
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -84,46 +86,58 @@ export default function SharePage() {
 
     setTransferring(true);
 
-    for (const fileObj of files) {
-      try {
-        // Update to transferring
-        setFiles(prev => prev.map(f => (f.id === fileObj.id ? { ...f, status: "transferring" } : f)));
+    try {
+      // Set up progress tracking for each file
+      files.forEach(file => {
+        const initialProgress: TransferProgress = {
+          fileId: file.id,
+          fileName: file.name,
+          status: "pending",
+          progress: 0
+        };
+        setTransferProgresses(prev => new Map(prev.set(file.id, initialProgress)));
+      });
 
-        // Upload file
-        const { file_url } = await UploadFile({ file: fileObj.file! });
+      // Update files to transferring status
+      setFiles(prev => prev.map(f => ({ ...f, status: "transferring" })));
 
-        // Create transfer record for each selected device
-        for (const device of selectedDevices) {
-          const transferRecord = await FileTransfer.create({
-            filename: fileObj.name,
-            file_size: fileObj.size,
-            file_type: fileObj.type,
-            file_url,
-            sender_device: "My Device",
-            recipient_device: device.name,
-            transfer_status: "completed",
-            transfer_speed: Math.random() * 50 + 10,
-            completion_time: new Date().toISOString()
-          });
-
-          setTransfers(prev => [transferRecord, ...prev]);
+      // Send files using the transfer service
+      const result = await sendFilesToDevices(files, selectedDevices, {
+        onProgress: (progress) => {
+          setTransferProgresses(prev => new Map(prev.set(progress.fileId, progress)));
+          
+          // Update file status based on progress
+          setFiles(prev => prev.map(f => {
+            if (f.id === progress.fileId) {
+              return { ...f, status: progress.status as any };
+            }
+            return f;
+          }));
         }
+      });
 
-        // Update to completed
-        setFiles(prev => prev.map(f => (f.id === fileObj.id ? { ...f, status: "completed" } : f)));
+      // Update transfers state with results
+      setTransfers(prev => [...result.transfers, ...prev]);
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        setFiles(prev => prev.map(f => (f.id === fileObj.id ? { ...f, status: "failed" } : f)));
-        console.error("Transfer failed:", error);
+      // Handle any errors
+      if (result.errors.length > 0) {
+        console.error("Transfer errors:", result.errors);
+        // You could show these errors to the user
       }
-    }
 
-    setTransferring(false);
-    // Remove completed after delay
-    setTimeout(() => {
-      setFiles(prev => prev.filter(f => f.status === "failed"));
-    }, 2000);
+    } catch (error) {
+      console.error("Transfer failed:", error);
+      // Update files to failed status
+      setFiles(prev => prev.map(f => ({ ...f, status: "failed" })));
+    } finally {
+      setTransferring(false);
+      
+      // Clean up completed files after a delay
+      setTimeout(() => {
+        setFiles(prev => prev.filter(f => f.status === "failed"));
+        setTransferProgresses(new Map());
+      }, 3000);
+    }
   };
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0);
@@ -275,7 +289,7 @@ export default function SharePage() {
 
             {transfers.length > 0 && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
-                <TransferProgress transfers={transfers.slice(0, 3)} />
+                <TransferProgressComponent transfers={transfers.slice(0, 3)} />
               </motion.div>
             )}
           </div>
