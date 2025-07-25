@@ -132,14 +132,44 @@ export function WiFiAwareProvider({ children }: Props) {
   ): Promise<boolean> => {
     const success = await broadcastService.respondToRequest(requestId, response, saveLocation);
     
+    // If accepted, add to history
+    if (success && response === "accept") {
+      const request = pendingRequests.find(r => r.id === requestId) || currentRequest;
+      if (request) {
+        try {
+          // Add to FileTransfer history
+          const { FileTransfer } = await import("@/entities/FileTransfer");
+          await FileTransfer.create({
+            filename: request.files.map(f => f.name).join(", "),
+            file_size: request.files.reduce((sum, f) => sum + f.size, 0),
+            file_type: request.files[0]?.type || "application/octet-stream",
+            sender_device: request.senderDevice.name,
+            recipient_device: "My Device",
+            transfer_status: "completed"
+          });
+        } catch (error) {
+          console.error("Failed to add transfer to history:", error);
+        }
+      }
+    }
+    
     if (success && response !== "pending") {
       // Remove from pending requests
       setPendingRequests(prev => prev.filter(r => r.id !== requestId));
       
-      // Close modal if this was the current request
+      // Close modal and show next request if any
       if (currentRequest?.id === requestId) {
         setShowModal(false);
         setCurrentRequest(null);
+        
+        // Show next pending request after a brief delay
+        setTimeout(() => {
+          const remainingRequests = pendingRequests.filter(r => r.id !== requestId);
+          if (remainingRequests.length > 0) {
+            setCurrentRequest(remainingRequests[0]);
+            setShowModal(true);
+          }
+        }, 300);
       }
     }
     

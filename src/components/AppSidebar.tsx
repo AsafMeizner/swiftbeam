@@ -27,7 +27,9 @@ import {
   Download
 } from "lucide-react";
 import { createPageUrl } from "@/utils/createPageUrl";
-import { useIncomingRequests, useBroadcastStatus } from "@/contexts/WiFiAwareContext";
+import { useIncomingRequests, useBroadcastSettings, useBroadcastStatus } from "@/contexts/WiFiAwareContext";
+import { getDeviceDiscoveryService } from "@/services/deviceDiscovery";
+import { DeviceData } from "@/types";
 
 const navigationItems = [
   { title: "Discovery", url: createPageUrl("Discovery"), icon: Wifi, description: "Find nearby devices" },
@@ -39,18 +41,25 @@ const navigationItems = [
 export function AppSidebar() {
   const pathname = usePathname();
   const [onlineDevicesCount, setOnlineDevicesCount] = useState(0);
-  const { pendingRequests } = useIncomingRequests();
+  const { pendingRequests, showRequest } = useIncomingRequests();
   const { isBroadcasting } = useBroadcastStatus();
+  const { settings } = useBroadcastSettings();
 
-  // Simulate device count for now - in real app this would come from context or props
+  // Get actual device count from device discovery service
   useEffect(() => {
-    // This would be replaced with actual device discovery logic
-    const simulateDeviceCount = () => {
-      setOnlineDevicesCount(Math.floor(Math.random() * 5) + 1);
+    const loadDevices = async () => {
+      try {
+        const deviceDiscovery = getDeviceDiscoveryService();
+        const activeDevices = await deviceDiscovery.getActiveDevices();
+        setOnlineDevicesCount(activeDevices.length);
+      } catch (error) {
+        console.error("Failed to load devices:", error);
+        setOnlineDevicesCount(0);
+      }
     };
-    
-    simulateDeviceCount();
-    const interval = setInterval(simulateDeviceCount, 10000); // Update every 10 seconds
+
+    loadDevices();
+    const interval = setInterval(loadDevices, 5000); // Update every 5 seconds
     
     return () => clearInterval(interval);
   }, []);
@@ -129,29 +138,45 @@ export function AppSidebar() {
             </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm truncate text-foreground">
-              My Device
+              {settings.deviceName}
             </p>
             <p className="text-xs truncate text-muted-foreground">
-              {isBroadcasting ? "Broadcasting" : "Ready to share"}
+              {!settings.enabled 
+                ? "Sharing disabled"
+                : settings.visibility === "off" 
+                  ? "Hidden"
+                  : settings.visibility === "contacts"
+                    ? "Contacts only"
+                    : isBroadcasting 
+                      ? "Broadcasting" 
+                      : "Ready to share"
+              }
             </p>
           </div>
           <Badge 
             variant="outline" 
             className={`text-xs ${
-              isBroadcasting 
+              settings.enabled && settings.visibility !== "off" && isBroadcasting
                 ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/30"
                 : "bg-gray-50 dark:bg-gray-950/30 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-800/30"
             }`}
           >
-            {isBroadcasting ? "Online" : "Offline"}
+            {settings.enabled && settings.visibility !== "off" && isBroadcasting ? "Online" : "Offline"}
           </Badge>
         </div>
 
         {/* Pending Requests Indicator */}
         {pendingRequests.length > 0 && (
-          <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800/30">
+          <button
+            onClick={() => {
+              if (pendingRequests.length > 0) {
+                showRequest(pendingRequests[0]);
+              }
+            }}
+            className="w-full flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+          >
             <Download className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <div className="flex-1">
+            <div className="flex-1 text-left">
               <p className="text-xs font-medium text-blue-700 dark:text-blue-400">
                 {pendingRequests.length} file request{pendingRequests.length !== 1 ? 's' : ''} waiting
               </p>
@@ -159,7 +184,7 @@ export function AppSidebar() {
             <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs">
               {pendingRequests.length}
             </Badge>
-          </div>
+          </button>
         )}
       </SidebarFooter>
     </Sidebar>

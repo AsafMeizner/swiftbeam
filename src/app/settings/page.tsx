@@ -145,8 +145,8 @@ export default function SettingsPage() {
                     <Label htmlFor="deviceName" className="text-gray-700 dark:text-gray-300">Device Name</Label>
                     <Input
                       id="deviceName"
-                      value={settings.deviceName}
-                      onChange={(e) => updateSetting("deviceName", e.target.value)}
+                      value={wifiSettings.deviceName}
+                      onChange={(e) => updateWifiSettings({ deviceName: e.target.value })}
                       placeholder="Enter device name"
                       className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     />
@@ -154,71 +154,17 @@ export default function SettingsPage() {
                       This name will be visible to other devices
                     </p>
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-gray-700 dark:text-gray-300">Auto Discovery</Label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Automatically appear to nearby devices</p>
-                    </div>
-                    <Switch
-                      checked={settings.autoDiscovery}
-                      onCheckedChange={(checked) => updateSetting("autoDiscovery", checked)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Network */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wifi className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    Network Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-gray-700 dark:text-gray-300">Network Interface</Label>
-                    <Select
-                      value={settings.networkInterface}
-                      onValueChange={(value) => updateSetting("networkInterface", value)}
-                    >
-                      <SelectTrigger className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="wifi">Wi-Fi</SelectItem>
-                        <SelectItem value="ethernet">Ethernet</SelectItem>
-                        <SelectItem value="hotspot">Mobile Hotspot</SelectItem>
-                        <SelectItem value="auto">Auto Select</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="maxFileSize" className="text-gray-700 dark:text-gray-300">Maximum File Size (MB)</Label>
-                    <Input
-                      id="maxFileSize"
-                      type="number"
-                      value={settings.maxFileSize}
-                      onChange={(e) => updateSetting("maxFileSize", e.target.value)}
-                      placeholder="100"
-                      className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                    />
-                  </div>
                 </CardContent>
               </Card>
             </motion.div>
 
             {/* WiFi Aware */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }}>
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
               <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Radio className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    WiFi Aware
+                    WiFi Aware File Sharing
                     <Badge 
                       variant="outline" 
                       className="ml-2 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 text-xs"
@@ -244,18 +190,6 @@ export default function SettingsPage() {
                         }
                       }}
                     />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="wifiDeviceName" className="text-gray-700 dark:text-gray-300">Device Name</Label>
-                    <Input
-                      id="wifiDeviceName"
-                      value={wifiSettings.deviceName}
-                      onChange={(e) => updateWifiSettings({ deviceName: e.target.value })}
-                      placeholder="My Device"
-                      className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This name will be visible to other devices</p>
                   </div>
 
                   <div>
