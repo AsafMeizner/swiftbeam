@@ -8,7 +8,6 @@
  */
 
 import { simulateIncomingFileRequest } from "@/services/wifiAwareBroadcast";
-import { getActiveDevices } from "@/services/deviceDiscovery";
 import { DeviceData, FileData } from "@/types";
 
 // Mock device data for testing
@@ -318,7 +317,7 @@ const swiftbeamDev = {
 
 // Attach to window in development
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-  (window as any).swiftbeamDev = swiftbeamDev;
+  (window as typeof window & { swiftbeamDev: typeof swiftbeamDev }).swiftbeamDev = swiftbeamDev;
   console.log("🛠️  SwiftBeam Dev Tools loaded! Type 'swiftbeamDev.help()' for available commands.");
 }
 

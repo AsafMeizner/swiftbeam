@@ -1,4 +1,3 @@
-import { getDeviceDiscoveryService } from "./deviceDiscovery";
 import { DeviceData, FileData } from "@/types";
 
 export interface IncomingFileRequest {
@@ -289,9 +288,21 @@ export class WiFiAwareBroadcastService {
   /**
    * Remove callback
    */
-  removeCallback(callback: Function): void {
+  removeCallback(callback: () => void): void {
     this.broadcastCallbacks = this.broadcastCallbacks.filter(cb => cb !== callback);
+  }
+
+  /**
+   * Remove incoming request callback
+   */
+  removeIncomingRequestCallback(callback: (request: IncomingFileRequest) => void): void {
     this.requestCallbacks = this.requestCallbacks.filter(cb => cb !== callback);
+  }
+
+  /**
+   * Remove request response callback
+   */
+  removeRequestResponseCallback(callback: (requestId: string, response: FileRequestResponse) => void): void {
     this.responseCallbacks = this.responseCallbacks.filter(cb => cb !== callback);
   }
 

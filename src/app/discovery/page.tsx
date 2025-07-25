@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getDeviceDiscoveryService } from "@/services/deviceDiscovery";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -48,6 +48,11 @@ export default function DiscoveryPage() {
 
   const deviceDiscovery = getDeviceDiscoveryService();
 
+  const loadDevices = useCallback(async () => {
+    const deviceList = await deviceDiscovery.getAllDevices("-last_seen");
+    setDevices(deviceList);
+  }, [deviceDiscovery]);
+
   useEffect(() => {
     loadDevices();
     
@@ -69,12 +74,7 @@ export default function DiscoveryPage() {
       clearInterval(interval);
       deviceDiscovery.removeScanStatusCallback(handleScanStatusChange);
     };
-  }, [deviceDiscovery]);
-
-  const loadDevices = async () => {
-    const deviceList = await deviceDiscovery.getAllDevices("-last_seen");
-    setDevices(deviceList);
-  };
+  }, [deviceDiscovery, loadDevices]);
 
   const simulateDeviceUpdate = () => {
     setDevices(prev =>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { sendFilesToDevices, getFileTransferService, type TransferProgress } from "@/services/fileTransfer";
+import { sendFilesToDevices } from "@/services/fileTransfer";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   File,
@@ -31,9 +31,6 @@ export default function SharePage() {
   const [transferring, setTransferring] = useState(false);
   const [transfers, setTransfers] = useState<FileTransferData[]>([]);
   const [dragActive, setDragActive] = useState(false);
-  const [transferProgresses, setTransferProgresses] = useState<Map<string, TransferProgress>>(new Map());
-
-  const transferService = getFileTransferService();
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -87,29 +84,16 @@ export default function SharePage() {
     setTransferring(true);
 
     try {
-      // Set up progress tracking for each file
-      files.forEach(file => {
-        const initialProgress: TransferProgress = {
-          fileId: file.id,
-          fileName: file.name,
-          status: "pending",
-          progress: 0
-        };
-        setTransferProgresses(prev => new Map(prev.set(file.id, initialProgress)));
-      });
-
       // Update files to transferring status
       setFiles(prev => prev.map(f => ({ ...f, status: "transferring" })));
 
       // Send files using the transfer service
       const result = await sendFilesToDevices(files, selectedDevices, {
         onProgress: (progress) => {
-          setTransferProgresses(prev => new Map(prev.set(progress.fileId, progress)));
-          
           // Update file status based on progress
           setFiles(prev => prev.map(f => {
             if (f.id === progress.fileId) {
-              return { ...f, status: progress.status as any };
+              return { ...f, status: progress.status as FileData['status'] };
             }
             return f;
           }));
@@ -135,7 +119,6 @@ export default function SharePage() {
       // Clean up completed files after a delay
       setTimeout(() => {
         setFiles(prev => prev.filter(f => f.status === "failed"));
-        setTransferProgresses(new Map());
       }, 3000);
     }
   };

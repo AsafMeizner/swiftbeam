@@ -28,8 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatFileSize, formatTimeAgo } from "@/utils/format";
 import { IncomingFileRequest, FileRequestResponse } from "@/services/wifiAwareBroadcast";
-import { DeviceData } from "@/types";
 import { LucideIcon } from "lucide-react";
+import Image from "next/image";
 
 const deviceIcons: Record<string, LucideIcon> = {
   phone: Smartphone,
@@ -163,7 +163,7 @@ export default function IncomingFileRequestModal({ request, isOpen, onResponse, 
                 {request.message && (
                   <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border-l-4 border-blue-500">
                     <p className="text-sm text-gray-700 dark:text-gray-300 italic">
-                      "{request.message}"
+                      &ldquo;{request.message}&rdquo;
                     </p>
                   </div>
                 )}
@@ -188,9 +188,11 @@ export default function IncomingFileRequestModal({ request, isOpen, onResponse, 
                           className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg"
                         >
                           {file.preview ? (
-                            <img
+                            <Image
                               src={file.preview}
                               alt={file.name}
+                              width={32}
+                              height={32}
                               className="w-8 h-8 rounded object-cover"
                             />
                           ) : (

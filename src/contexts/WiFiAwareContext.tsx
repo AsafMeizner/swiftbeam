@@ -99,8 +99,8 @@ export function WiFiAwareProvider({ children }: Props) {
     // Cleanup
     return () => {
       broadcastService.removeCallback(handleBroadcastStatusChange);
-      broadcastService.removeCallback(handleIncomingRequest);
-      broadcastService.removeCallback(handleRequestResponse);
+      broadcastService.removeIncomingRequestCallback(handleIncomingRequest);
+      broadcastService.removeRequestResponseCallback(handleRequestResponse);
     };
   }, [broadcastService, currentRequest]);
 

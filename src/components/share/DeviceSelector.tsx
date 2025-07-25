@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getDeviceDiscoveryService } from "@/services/deviceDiscovery";
 import { motion } from "framer-motion";
 import {
@@ -37,6 +37,11 @@ export default function DeviceSelector({ selectedDevices, onDeviceSelect }: Prop
   const [isScanning, setIsScanning] = useState(false);
   const deviceDiscovery = getDeviceDiscoveryService();
 
+  const loadDevices = useCallback(async () => {
+    const list = await deviceDiscovery.getAllDevices("-last_seen");
+    setDevices(list);
+  }, [deviceDiscovery]);
+
   useEffect(() => {
     loadDevices();
     
@@ -50,12 +55,7 @@ export default function DeviceSelector({ selectedDevices, onDeviceSelect }: Prop
     return () => {
       deviceDiscovery.removeScanStatusCallback(handleScanStatusChange);
     };
-  }, [deviceDiscovery]);
-
-  const loadDevices = async () => {
-    const list = await deviceDiscovery.getAllDevices("-last_seen");
-    setDevices(list);
-  };
+  }, [deviceDiscovery, loadDevices]);
 
   const scanForDevices = async () => {
     await deviceDiscovery.startScan(1500);
