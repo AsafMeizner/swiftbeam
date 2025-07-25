@@ -40,6 +40,11 @@ export default function SettingsPage() {
     maxFileSize: "100",
     networkInterface: "wifi"
   });
+  const [userInfo, setUserInfo] = useState({
+    fullName: "Swift User",
+    email: "",
+    phoneNumber: ""
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [justSaved, setJustSaved] = useState(false);
@@ -55,8 +60,24 @@ export default function SettingsPage() {
       if (userData.settings) {
         setSettings(prev => ({ ...prev, ...userData.settings }));
       }
+      // Load user info from userData or localStorage
+      const savedUserInfo = localStorage.getItem('userInfo');
+      if (savedUserInfo) {
+        setUserInfo(JSON.parse(savedUserInfo));
+      } else if (userData) {
+        setUserInfo({
+          fullName: userData.full_name || "Swift User",
+          email: userData.email || "",
+          phoneNumber: "" // Will be stored separately in localStorage
+        });
+      }
     } catch (error) {
       console.error("Error loading user data:", error);
+      // Load from localStorage as fallback
+      const savedUserInfo = localStorage.getItem('userInfo');
+      if (savedUserInfo) {
+        setUserInfo(JSON.parse(savedUserInfo));
+      }
     }
     setIsLoading(false);
   };
@@ -65,6 +86,8 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       await User.updateMyUserData({ settings });
+      // Save user info to localStorage
+      localStorage.setItem('userInfo', JSON.stringify(userInfo));
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 2000); // Show "Saved!" for 2 seconds
     } catch (error) {
@@ -75,6 +98,10 @@ export default function SettingsPage() {
 
   const updateSetting = (key: string, value: string | boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateUserInfo = (key: string, value: string) => {
+    setUserInfo(prev => ({ ...prev, [key]: value }));
   };
 
   if (isLoading) {
@@ -105,8 +132,8 @@ export default function SettingsPage() {
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <UserIcon className="w-10 h-10 text-white" />
                 </div>
-                <CardTitle className="text-xl">{user?.full_name || "User"}</CardTitle>
-                <p className="text-gray-600 dark:text-gray-400">{user?.email}</p>
+                <CardTitle className="text-xl">{userInfo.fullName}</CardTitle>
+                <p className="text-gray-600 dark:text-gray-400">{userInfo.email || "No email set"}</p>
                 <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/30 mx-auto">
                   Online
                 </Badge>
@@ -130,8 +157,65 @@ export default function SettingsPage() {
 
           {/* Panels */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Device */}
+            {/* User Info */}
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+              <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    User Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="fullName" className="text-gray-700 dark:text-gray-300">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      value={userInfo.fullName}
+                      onChange={(e) => updateUserInfo("fullName", e.target.value)}
+                      placeholder="Enter your full name"
+                      className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This name will be displayed in your profile and shared with contacts
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={userInfo.email}
+                      onChange={(e) => updateUserInfo("email", e.target.value)}
+                      placeholder="Enter your email address"
+                      className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Used for contact sharing and notifications
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phoneNumber" className="text-gray-700 dark:text-gray-300">Phone Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      value={userInfo.phoneNumber}
+                      onChange={(e) => updateUserInfo("phoneNumber", e.target.value)}
+                      placeholder="Enter your phone number"
+                      className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Optional - for contact sharing with nearby devices
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Device */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
               <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -158,12 +242,12 @@ export default function SettingsPage() {
             </motion.div>
 
             {/* WiFi Aware */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
               <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Radio className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    WiFi Aware File Sharing
+                    Sharing and Receiving Options
                     <Badge 
                       variant="outline" 
                       className="ml-2 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 text-xs"
@@ -279,7 +363,7 @@ export default function SettingsPage() {
             </motion.div>
 
             {/* Security */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
               <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -324,7 +408,7 @@ export default function SettingsPage() {
             </motion.div>
 
             {/* Notifications */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
               <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -362,7 +446,7 @@ export default function SettingsPage() {
             </motion.div>
 
             {/* Save */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="flex justify-end">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="flex justify-end">
               <Button
                 onClick={saveSettings}
                 disabled={isSaving}

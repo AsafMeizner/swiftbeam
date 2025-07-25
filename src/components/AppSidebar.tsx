@@ -58,7 +58,8 @@ export function AppSidebar() {
     };
 
     loadDevices();
-    const interval = setInterval(loadDevices, 5000); // Update every 5 seconds
+    // Update more frequently to stay in sync
+    const interval = setInterval(loadDevices, 2000); // Update every 2 seconds
     
     return () => clearInterval(interval);
   }, []);
