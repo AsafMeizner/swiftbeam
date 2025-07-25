@@ -4,10 +4,11 @@ This document describes the refactored device discovery and file transfer functi
 
 ## Overview
 
-The functionality has been split into two main services:
+The functionality has been split into three main services:
 
 1. **`DeviceDiscoveryService`** - Handles finding and managing nearby devices
 2. **`FileTransferService`** - Handles sending files to multiple devices with progress tracking
+3. **`WiFiAwareBroadcastService`** - Handles WiFi Aware broadcasting and incoming file requests
 
 ## Services
 
@@ -94,6 +95,65 @@ if (result.success) {
 }
 ```
 
+### WiFi Aware Broadcast Service (`src/services/wifiAwareBroadcast.ts`)
+
+Handles WiFi Aware broadcasting for cross-platform device discovery and incoming file request management.
+
+#### Key Features:
+- Cross-platform WiFi Aware broadcasting (iOS, Android, Windows, macOS)
+- Device availability broadcasting with configurable visibility
+- Incoming file request handling with accept/decline functionality
+- File preview support for images
+- Auto-accept from trusted devices
+- File size limitations and security settings
+
+#### Main Functions:
+```typescript
+// Get instance
+const broadcastService = getWiFiAwareBroadcastService();
+
+// Broadcasting control
+await startBroadcasting();
+await stopBroadcasting();
+const isActive = isBroadcasting();
+
+// Settings management
+await broadcastService.updateSettings({
+  enabled: true,
+  visibility: "everyone",
+  deviceName: "My Device"
+});
+
+// Handle incoming requests
+broadcastService.onIncomingRequest((request) => {
+  // Show modal to user
+});
+
+await respondToFileRequest(requestId, "accept", "/Downloads");
+```
+
+#### Example Usage:
+```typescript
+import { getWiFiAwareBroadcastService } from '@/services/wifiAwareBroadcast';
+
+const service = getWiFiAwareBroadcastService();
+
+// Enable file sharing
+await service.updateSettings({
+  enabled: true,
+  visibility: "everyone",
+  deviceName: "John's MacBook"
+});
+
+await service.startBroadcasting();
+
+// Handle incoming requests
+service.onIncomingRequest((request) => {
+  console.log(`File request from ${request.senderDevice.name}`);
+  console.log(`Files: ${request.files.map(f => f.name).join(', ')}`);
+});
+```
+
 ## Updated Components
 
 ### DeviceSelector Component (`src/components/share/DeviceSelector.tsx`)
@@ -117,6 +177,48 @@ Updated to use the new `DeviceDiscoveryService`:
 - Improved device scanning
 - Better state management
 - Enhanced filtering capabilities
+
+### Settings Page (`src/app/settings/page.tsx`)
+
+Added WiFi Aware settings section:
+- Enable/disable file sharing broadcasting
+- Configure device visibility (everyone, contacts, hidden)
+- Set device name and file size limits
+- Auto-accept settings for trusted devices
+- Real-time broadcast status indicators
+
+### App Layout (`src/app/layout.tsx`)
+
+Integrated WiFi Aware provider:
+- Global WiFi Aware context for all components
+- Automatic incoming file request modal handling
+- Development tools loader for testing
+
+### App Sidebar (`src/components/AppSidebar.tsx`)
+
+Enhanced with WiFi Aware status:
+- Shows broadcasting status (online/offline)
+- Displays pending file request count
+- Visual indicators for incoming requests
+
+## New Components
+
+### IncomingFileRequestModal (`src/components/modals/IncomingFileRequestModal.tsx`)
+
+Modal for handling incoming file requests:
+- Displays sender device information
+- Shows file list with previews and sizes
+- Save location selection
+- Accept/decline buttons with progress indication
+- Large file warnings and transfer time estimates
+
+### WiFiAwareContext (`src/contexts/WiFiAwareContext.tsx`)
+
+Global context provider for WiFi Aware functionality:
+- Manages broadcast state and settings
+- Handles incoming file requests
+- Provides hooks for components to access WiFi Aware features
+- Automatic modal management for file requests
 
 ## Types and Interfaces
 
@@ -142,14 +244,73 @@ interface TransferResult {
 }
 ```
 
+### Incoming File Request
+```typescript
+interface IncomingFileRequest {
+  id: string;
+  senderDevice: DeviceData;
+  files: {
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    preview?: string; // Base64 preview for images
+  }[];
+  timestamp: Date;
+  message?: string;
+  estimatedTransferTime: number; // in seconds
+}
+```
+
+### Broadcast Settings
+```typescript
+interface BroadcastSettings {
+  enabled: boolean;
+  deviceName: string;
+  visibility: "everyone" | "contacts" | "off";
+  autoAcceptFromTrustedDevices: boolean;
+  allowPreview: boolean;
+  maxFileSize: number; // in bytes
+}
+```
+
+## Development Tools
+
+### Console Commands (`src/utils/devConsole.ts`)
+
+Development console commands for testing WiFi Aware functionality:
+
+```javascript
+// Open browser console and use these commands:
+
+// Simulate incoming file requests
+swiftbeamDev.simulateIncomingFile()                    // Single random file
+swiftbeamDev.simulateMultipleFiles(3)                  // Multiple files
+swiftbeamDev.simulateLargeFile()                       // Large file (1.5GB)
+swiftbeamDev.simulateBurst(5)                          // Multiple requests over time
+
+// Custom requests
+swiftbeamDev.createCustomRequest("John's iPhone", "report.pdf", 2.5, "Here's the report!")
+
+// Test broadcasting
+swiftbeamDev.testBroadcasting()                        // Check broadcast status
+
+// Get help
+swiftbeamDev.help()                                    // Show all commands
+```
+
+**Note:** Make sure WiFi Aware is enabled in Settings to see the incoming file modal!
+
 ## Migration Benefits
 
-1. **Separation of Concerns**: Device discovery and file transfer logic are now separate
+1. **Separation of Concerns**: Device discovery, file transfer, and broadcasting logic are now separate
 2. **Easier Testing**: Services can be tested independently
-3. **Better Maintainability**: Changes to transfer logic don't affect discovery logic
+3. **Better Maintainability**: Changes to one service don't affect others
 4. **Future-Proof**: Easy to replace mock implementations with real networking code
 5. **Enhanced Features**: Better progress tracking, error handling, and status management
 6. **Reusability**: Services can be used across different components
+7. **Cross-Platform Ready**: WiFi Aware service prepared for iOS, Android, Windows, macOS
+8. **User Experience**: Seamless incoming file request handling with modal interface
 
 ## Future Implementation
 
@@ -168,6 +329,13 @@ Replace the mock transfer logic in `FileTransferService` with:
 - Real transfer speed and ETA calculations
 - Network error handling and retry logic
 
+### WiFi Aware Broadcasting
+Replace the mock broadcasting logic in `WiFiAwareBroadcastService` with:
+- Real WiFi Aware session management (iOS NearbyInteraction, Android Aware, Windows WiFi Direct)
+- Actual device discovery and publishing
+- Cross-platform protocol handling
+- Real file reception and transfer coordination
+
 ## Example Implementation
 
 See `src/examples/serviceUsage.ts` for comprehensive examples of how to use both services in various scenarios.
@@ -176,7 +344,12 @@ See `src/examples/serviceUsage.ts` for comprehensive examples of how to use both
 
 - `src/services/deviceDiscovery.ts` - Device discovery service
 - `src/services/fileTransfer.ts` - File transfer service
+- `src/services/wifiAwareBroadcast.ts` - WiFi Aware broadcasting service
+- `src/contexts/WiFiAwareContext.tsx` - Global WiFi Aware context provider
+- `src/components/modals/IncomingFileRequestModal.tsx` - Incoming file request modal
+- `src/utils/devConsole.ts` - Development testing commands
 - `src/examples/serviceUsage.ts` - Usage examples
 - `src/components/share/DeviceSelector.tsx` - Updated device selector
 - `src/app/share/page.tsx` - Updated share page
 - `src/app/discovery/page.tsx` - Updated discovery page
+- `src/app/settings/page.tsx` - Updated settings with WiFi Aware controls

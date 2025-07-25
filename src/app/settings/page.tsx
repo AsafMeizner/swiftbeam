@@ -11,7 +11,10 @@ import {
   Bell,
   Save,
   RefreshCw,
-  Check
+  Check,
+  Radio,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +26,13 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { UserData } from "@/types";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useBroadcastSettings, useBroadcastStatus } from "@/contexts/WiFiAwareContext";
 
 export default function SettingsPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const { theme, setTheme } = useTheme();
+  const { settings: wifiSettings, updateSettings: updateWifiSettings } = useBroadcastSettings();
+  const { isBroadcasting, startBroadcasting, stopBroadcasting } = useBroadcastStatus();
   const [settings, setSettings] = useState({
     deviceName: "My Device",
     autoDiscovery: true,
@@ -201,6 +207,139 @@ export default function SettingsPage() {
                       placeholder="100"
                       className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* WiFi Aware */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }}>
+              <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Radio className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    WiFi Aware
+                    <Badge 
+                      variant="outline" 
+                      className="ml-2 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 text-xs"
+                    >
+                      {isBroadcasting ? "Broadcasting" : "Stopped"}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-gray-700 dark:text-gray-300">Enable File Sharing</Label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Allow nearby devices to send you files</p>
+                    </div>
+                    <Switch
+                      checked={wifiSettings.enabled}
+                      onCheckedChange={async (checked) => {
+                        await updateWifiSettings({ enabled: checked });
+                        if (checked) {
+                          await startBroadcasting();
+                        } else {
+                          await stopBroadcasting();
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="wifiDeviceName" className="text-gray-700 dark:text-gray-300">Device Name</Label>
+                    <Input
+                      id="wifiDeviceName"
+                      value={wifiSettings.deviceName}
+                      onChange={(e) => updateWifiSettings({ deviceName: e.target.value })}
+                      placeholder="My Device"
+                      className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This name will be visible to other devices</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-gray-700 dark:text-gray-300">Visibility</Label>
+                    <Select
+                      value={wifiSettings.visibility}
+                      onValueChange={(value: "everyone" | "contacts" | "off") => updateWifiSettings({ visibility: value })}
+                    >
+                      <SelectTrigger className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
+                        <SelectValue placeholder="Select visibility" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="everyone">
+                          <div className="flex items-center gap-2">
+                            <Eye className="w-4 h-4" />
+                            <span>Everyone</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="contacts">
+                          <div className="flex items-center gap-2">
+                            <Eye className="w-4 h-4" />
+                            <span>Contacts Only</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="off">
+                          <div className="flex items-center gap-2">
+                            <EyeOff className="w-4 h-4" />
+                            <span>Hidden</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-gray-700 dark:text-gray-300">Auto-accept from trusted devices</Label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Automatically accept files from known contacts</p>
+                    </div>
+                    <Switch
+                      checked={wifiSettings.autoAcceptFromTrustedDevices}
+                      onCheckedChange={(checked) => updateWifiSettings({ autoAcceptFromTrustedDevices: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-gray-700 dark:text-gray-300">Allow file previews</Label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Show image thumbnails in transfer requests</p>
+                    </div>
+                    <Switch
+                      checked={wifiSettings.allowPreview}
+                      onCheckedChange={(checked) => updateWifiSettings({ allowPreview: checked })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="maxFileSize" className="text-gray-700 dark:text-gray-300">Max File Size (MB)</Label>
+                    <Input
+                      id="maxFileSize"
+                      type="number"
+                      value={Math.round(wifiSettings.maxFileSize / (1024 * 1024))}
+                      onChange={(e) => {
+                        const mb = parseInt(e.target.value) || 100;
+                        updateWifiSettings({ maxFileSize: mb * 1024 * 1024 });
+                      }}
+                      placeholder="100"
+                      className="mt-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="text-sm space-y-2">
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                      <Radio className="w-4 h-4" />
+                      <span className="font-medium">Cross-platform file sharing</span>
+                    </div>
+                    <ul className="text-gray-600 dark:text-gray-400 space-y-1 pl-6 text-xs">
+                      <li>• Compatible with iOS, Android, Windows, macOS</li>
+                      <li>• Uses WiFi Aware for direct device connection</li>
+                      <li>• No internet connection required</li>
+                      <li>• Encrypted and secure transfers</li>
+                    </ul>
                   </div>
                 </CardContent>
               </Card>

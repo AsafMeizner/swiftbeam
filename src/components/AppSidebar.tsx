@@ -24,8 +24,10 @@ import {
   Settings,
   History,
   Share,
+  Download
 } from "lucide-react";
 import { createPageUrl } from "@/utils/createPageUrl";
+import { useIncomingRequests, useBroadcastStatus } from "@/contexts/WiFiAwareContext";
 
 const navigationItems = [
   { title: "Discovery", url: createPageUrl("Discovery"), icon: Wifi, description: "Find nearby devices" },
@@ -37,6 +39,8 @@ const navigationItems = [
 export function AppSidebar() {
   const pathname = usePathname();
   const [onlineDevicesCount, setOnlineDevicesCount] = useState(0);
+  const { pendingRequests } = useIncomingRequests();
+  const { isBroadcasting } = useBroadcastStatus();
 
   // Simulate device count for now - in real app this would come from context or props
   useEffect(() => {
@@ -117,7 +121,8 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-gray-100 dark:border-gray-800 p-4">
+      <SidebarFooter className="border-t border-gray-100 dark:border-gray-800 p-4 space-y-3">
+        {/* Device Status */}
         <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
             <Smartphone className="w-5 h-5 text-white" />
@@ -127,13 +132,35 @@ export function AppSidebar() {
               My Device
             </p>
             <p className="text-xs truncate text-muted-foreground">
-              Ready to share
+              {isBroadcasting ? "Broadcasting" : "Ready to share"}
             </p>
           </div>
-          <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/30">
-            Online
+          <Badge 
+            variant="outline" 
+            className={`text-xs ${
+              isBroadcasting 
+                ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/30"
+                : "bg-gray-50 dark:bg-gray-950/30 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-800/30"
+            }`}
+          >
+            {isBroadcasting ? "Online" : "Offline"}
           </Badge>
         </div>
+
+        {/* Pending Requests Indicator */}
+        {pendingRequests.length > 0 && (
+          <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800/30">
+            <Download className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <div className="flex-1">
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                {pendingRequests.length} file request{pendingRequests.length !== 1 ? 's' : ''} waiting
+              </p>
+            </div>
+            <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs">
+              {pendingRequests.length}
+            </Badge>
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
