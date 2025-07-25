@@ -233,7 +233,7 @@ export default function IncomingFileRequestModal({ request, isOpen, onResponse, 
                       value={saveLocation}
                       onChange={(e) => setSaveLocation(e.target.value)}
                       placeholder="Choose save location..."
-                      className="flex-1"
+                      className="flex-1 bg-gray-50 dark:bg-gray-700 border-0 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     />
                     <Button
                       variant="outline"

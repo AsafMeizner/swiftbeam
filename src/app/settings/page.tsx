@@ -246,11 +246,11 @@ export default function SettingsPage() {
               <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Radio className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <Radio className="w-5 h-5 text-green-600 dark:text-green-400" />
                     Sharing and Receiving Options
                     <Badge 
                       variant="outline" 
-                      className="ml-2 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 text-xs"
+                      className="ml-2 bg-blue-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-xs"
                     >
                       {isBroadcasting ? "Broadcasting" : "Stopped"}
                     </Badge>
@@ -347,7 +347,7 @@ export default function SettingsPage() {
                   <Separator />
 
                   <div className="text-sm space-y-2">
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                       <Radio className="w-4 h-4" />
                       <span className="font-medium">Cross-platform file sharing</span>
                     </div>
@@ -392,7 +392,7 @@ export default function SettingsPage() {
                   <Separator />
 
                   <div className="text-sm space-y-2">
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
                       <Shield className="w-4 h-4" />
                       <span className="font-medium">Your data is secure</span>
                     </div>
