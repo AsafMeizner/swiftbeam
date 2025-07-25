@@ -29,7 +29,6 @@ import {
 import { createPageUrl } from "@/utils/createPageUrl";
 import { useIncomingRequests, useBroadcastSettings, useBroadcastStatus } from "@/contexts/WiFiAwareContext";
 import { getDeviceDiscoveryService } from "@/services/deviceDiscovery";
-import { DeviceData } from "@/types";
 
 const navigationItems = [
   { title: "Discovery", url: createPageUrl("Discovery"), icon: Wifi, description: "Find nearby devices" },

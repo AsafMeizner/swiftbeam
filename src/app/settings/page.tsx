@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import {
   User as UserIcon,
   Smartphone,
-  Wifi,
   Shield,
   Bell,
   Save,
