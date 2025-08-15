@@ -1,14 +1,12 @@
 import "./globals.css";
 import React from "react";
-import { Inter } from "next/font/google";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { WiFiAwareProvider } from "@/contexts/WiFiAwareContext";
-import DevToolsLoader from "@/components/DevToolsLoader";
+// import DevToolsLoader from "@/components/DevToolsLoader";
 
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "SwiftBeam",
@@ -17,7 +15,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.className}>
+    <html lang="en">
       <body>
         <ThemeProvider>
           <WiFiAwareProvider>
@@ -37,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </SidebarProvider>
             
             {/* Load dev tools in development */}
-            <DevToolsLoader />
+            {/* <DevToolsLoader /> */}
           </WiFiAwareProvider>
         </ThemeProvider>
       </body>

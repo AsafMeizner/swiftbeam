@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">swiftbeam</string>
+    <string name="title_activity_main">swiftbeam</string>
+    <string name="package_name">com.swiftbeam.app</string>
+    <string name="custom_url_scheme">com.swiftbeam.app</string>
+</resources>

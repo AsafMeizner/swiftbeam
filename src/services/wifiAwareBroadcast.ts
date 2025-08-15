@@ -1,429 +1,272 @@
-import { DeviceData, FileData } from "@/types";
+// src/services/wifiAwareBroadcast.ts
+'use client';
+
+import { WifiAwareCore, jsonFromB64 } from '@/lib/wifiAwareCore';
+import { completeDeviceData } from '@/lib/deviceAdapters';
+import type { DeviceData, FileData } from '@/types';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 export interface IncomingFileRequest {
   id: string;
   senderDevice: DeviceData;
-  files: {
-    id: string;
-    name: string;
-    size: number;
-    type: string;
-    preview?: string; // Base64 preview for images
-  }[];
+  files: { id: string; name: string; size: number; type: string; preview?: string }[];
   timestamp: Date;
-  message?: string; // Optional message from sender
-  estimatedTransferTime: number; // in seconds
+  message?: string;
+  estimatedTransferTime: number;
 }
 
 export interface BroadcastSettings {
   enabled: boolean;
   deviceName: string;
-  visibility: "everyone" | "contacts" | "off";
+  visibility: 'everyone' | 'contacts' | 'off';
   autoAcceptFromTrustedDevices: boolean;
   allowPreview: boolean;
-  maxFileSize: number; // in bytes
+  maxFileSize: number;
 }
 
-export type FileRequestResponse = "accept" | "decline" | "pending";
+export type FileRequestResponse = 'accept' | 'decline' | 'pending';
 
-/**
- * Service for WiFi Aware broadcasting and receiving file requests
- * Handles device availability broadcasting and incoming file request management
- */
+const trustedDeviceIds = new Set<string>();
+
 export class WiFiAwareBroadcastService {
   private static instance: WiFiAwareBroadcastService;
+
   private broadcastingActive = false;
   private settings: BroadcastSettings = {
     enabled: false,
-    deviceName: "My Device",
-    visibility: "everyone",
+    deviceName: 'My Device',
+    visibility: 'everyone',
     autoAcceptFromTrustedDevices: false,
     allowPreview: true,
-    maxFileSize: 100 * 1024 * 1024 // 100MB default
+    maxFileSize: 100 * 1024 * 1024,
   };
-  
+
   private incomingRequests = new Map<string, IncomingFileRequest>();
-  private broadcastCallbacks: (() => void)[] = [];
-  private requestCallbacks: ((request: IncomingFileRequest) => void)[] = [];
-  private responseCallbacks: ((requestId: string, response: FileRequestResponse) => void)[] = [];
+  private broadcastCallbacks: Array<() => void> = [];
+  private requestCallbacks: Array<(r: IncomingFileRequest) => void> = [];
+  private responseCallbacks: Array<(id: string, r: FileRequestResponse) => void> = [];
+  private disposers: Array<{ remove: () => Promise<void> }> = [];
+  private myDeviceId = crypto.randomUUID();
 
-  private constructor() {
-    this.loadSettings();
-  }
+  private constructor() { this.loadSettings(); }
 
-  static getInstance(): WiFiAwareBroadcastService {
+  static getInstance() {
     if (!WiFiAwareBroadcastService.instance) {
       WiFiAwareBroadcastService.instance = new WiFiAwareBroadcastService();
     }
     return WiFiAwareBroadcastService.instance;
   }
 
-  /**
-   * Start broadcasting device availability for file sharing
-   * @returns Promise that resolves when broadcasting starts
-   */
   async startBroadcasting(): Promise<boolean> {
-    if (!this.settings.enabled) {
-      console.warn("Broadcasting is disabled in settings");
-      return false;
-    }
+    if (!this.settings.enabled) return false;
+    if (!WifiAwareCore.isNative()) return false;
+    if (this.broadcastingActive) return true;
 
-    if (this.broadcastingActive) {
-      return true;
-    }
+    const ok = await WifiAwareCore.ensureAttached();
+    if (!ok) return false;
 
-    try {
-      // In real implementation, this would:
-      // 1. Initialize WiFi Aware session
-      // 2. Start publishing service with device info
-      // 3. Set up discovery listeners
-      
-      this.broadcastingActive = true;
-      console.log(`Started broadcasting as "${this.settings.deviceName}"`);
-      
-      // Simulate WiFi Aware broadcasting
-      this.simulateBroadcastingSetup();
-      
-      this.notifyBroadcastCallbacks();
-      return true;
-    } catch (error) {
-      console.error("Failed to start broadcasting:", error);
-      return false;
-    }
+    // Message handler: file-request & xfer-offer
+    this.disposers.push(
+      await WifiAwareCore.on('messageReceived', async (m: any) => {
+        const peerId = String(m?.peerId ?? '');
+        if (!peerId || !m?.dataBase64) return;
+
+        let msg: any;
+        try { msg = jsonFromB64<any>(m.dataBase64); } catch { return; }
+
+        if (msg?.type === 'file-request') {
+          const reqId = crypto.randomUUID();
+          const now = new Date();
+          const sender = completeDeviceData({
+            id: msg.sender?.deviceId ?? peerId,
+            name: msg.sender?.name ?? 'Unknown',
+            platform: msg.sender?.platform ?? 'android',
+            is_online: true,
+            last_seen: now.toISOString(),
+          });
+
+          const request: IncomingFileRequest = {
+            id: reqId,
+            senderDevice: sender,
+            files: (msg.files ?? []).map((f: any) => ({
+              id: String(f.id ?? crypto.randomUUID()),
+              name: String(f.name ?? 'file'),
+              size: Number(f.size ?? 0),
+              type: String(f.type ?? 'application/octet-stream'),
+            })),
+            timestamp: now,
+            message: msg.message,
+            estimatedTransferTime: this.estimateSeconds(msg.files ?? []),
+          };
+
+          this.incomingRequests.set(reqId, request);
+          this.notifyRequestCallbacks(request);
+
+          if (this.settings.autoAcceptFromTrustedDevices && trustedDeviceIds.has(sender.id)) {
+            await this.respondToRequest(reqId, 'accept');
+          }
+        }
+
+        if (msg?.type === 'xfer-offer' && Array.isArray(msg.files)) {
+          await this.handleTransferOffer({
+            fromPeerId: peerId,
+            files: msg.files.map((f: any) => ({
+              id: String(f.id),
+              name: String(f.name),
+              url: String(f.url),
+              type: String(f.type ?? 'application/octet-stream'),
+            })),
+            messageId: msg.messageId,
+          });
+        }
+      }),
+    );
+
+    // Publish our presence
+    await WifiAwareCore.publish({
+      deviceId: this.myDeviceId,
+      name: this.settings.deviceName,
+      platform: 'android',
+      visibility: this.settings.visibility,
+      allowPreview: this.settings.allowPreview,
+      v: 1,
+      ts: Date.now(),
+    });
+
+    this.broadcastingActive = true;
+    this.notifyBroadcastCallbacks();
+    return true;
   }
 
-  /**
-   * Stop broadcasting device availability
-   * @returns Promise that resolves when broadcasting stops
-   */
   async stopBroadcasting(): Promise<boolean> {
-    if (!this.broadcastingActive) {
-      return true;
-    }
-
+    if (!this.broadcastingActive) return true;
     try {
-      // In real implementation, this would:
-      // 1. Stop WiFi Aware publishing
-      // 2. Clean up discovery listeners
-      // 3. Close WiFi Aware session
-      
+      await WifiAwareCore.stopAll();
       this.broadcastingActive = false;
-      console.log("Stopped broadcasting");
-      
+      await Promise.allSettled(this.disposers.map(d => d.remove()));
+      this.disposers = [];
       this.notifyBroadcastCallbacks();
       return true;
-    } catch (error) {
-      console.error("Failed to stop broadcasting:", error);
-      return false;
-    }
+    } catch { return false; }
   }
 
-  /**
-   * Check if currently broadcasting
-   */
-  isBroadcasting(): boolean {
-    return this.broadcastingActive;
-  }
+  isBroadcasting() { return this.broadcastingActive; }
 
-  /**
-   * Update broadcast settings
-   * @param newSettings - New settings to apply
-   */
-  async updateSettings(newSettings: Partial<BroadcastSettings>): Promise<void> {
-    const oldEnabled = this.settings.enabled;
+  async updateSettings(newSettings: Partial<BroadcastSettings>) {
+    const wasEnabled = this.settings.enabled;
     this.settings = { ...this.settings, ...newSettings };
-    
-    // Save to storage (localStorage for now, could be replaced with proper storage)
-    localStorage.setItem('wifiAwareBroadcastSettings', JSON.stringify(this.settings));
-    
-    // Restart broadcasting if enabled state changed
-    if (oldEnabled !== this.settings.enabled) {
-      if (this.settings.enabled) {
-        await this.startBroadcasting();
-      } else {
-        await this.stopBroadcasting();
-      }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wifiAwareBroadcastSettings', JSON.stringify(this.settings));
+    }
+
+    if (wasEnabled !== this.settings.enabled) {
+      if (this.settings.enabled) await this.startBroadcasting();
+      else await this.stopBroadcasting();
     } else if (this.broadcastingActive && this.settings.enabled) {
-      // Restart broadcasting to apply new settings
       await this.stopBroadcasting();
       await this.startBroadcasting();
     }
   }
 
-  /**
-   * Get current broadcast settings
-   */
-  getSettings(): BroadcastSettings {
-    return { ...this.settings };
-  }
+  getSettings(): BroadcastSettings { return { ...this.settings }; }
 
-  /**
-   * Simulate receiving an incoming file request (for testing)
-   * @param senderDevice - Device sending the files
-   * @param files - Files being sent
-   * @param message - Optional message from sender
-   */
-  simulateIncomingRequest(
-    senderDevice: DeviceData,
-    files: FileData[],
-    message?: string
-  ): string {
-    const requestId = crypto.randomUUID();
-    
-    const request: IncomingFileRequest = {
-      id: requestId,
-      senderDevice,
-      files: files.map(file => ({
-        id: file.id,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        preview: file.type.startsWith('image/') ? this.generateMockPreview() : undefined
-      })),
-      timestamp: new Date(),
+  async sendFileRequest(toPeerId: string, files: FileData[], sender: DeviceData, message?: string) {
+    const payload = {
+      type: 'file-request',
+      sender: { deviceId: sender.id, name: sender.name, platform: sender.platform },
+      files: files.map(f => ({ id: f.id, name: f.name, size: f.size, type: f.type })),
       message,
-      estimatedTransferTime: this.calculateEstimatedTime(files)
+      v: 1,
+      ts: Date.now(),
     };
-
-    this.incomingRequests.set(requestId, request);
-    
-    // Notify listeners
-    this.notifyRequestCallbacks(request);
-    
-    console.log(`Simulated incoming file request from ${senderDevice.name}:`, files.map(f => f.name));
-    return requestId;
+    await WifiAwareCore.sendMessage(toPeerId, payload);
   }
 
-  /**
-   * Respond to an incoming file request
-   * @param requestId - ID of the request to respond to
-   * @param response - Accept or decline the request
-   * @param saveLocation - Optional save location for accepted files
-   */
-  async respondToRequest(
-    requestId: string,
-    response: FileRequestResponse,
-    saveLocation?: string
-  ): Promise<boolean> {
-    const request = this.incomingRequests.get(requestId);
-    if (!request) {
-      console.error("Request not found:", requestId);
-      return false;
-    }
-
-    try {
-      if (response === "accept") {
-        console.log(`Accepted file request from ${request.senderDevice.name}`);
-        
-        // In real implementation, this would:
-        // 1. Send acceptance response via WiFi Aware
-        // 2. Set up file receiving endpoints
-        // 3. Start file transfer process
-        
-        // For now, simulate acceptance
-        this.simulateFileReception(request, saveLocation);
-      } else if (response === "decline") {
-        console.log(`Declined file request from ${request.senderDevice.name}`);
-        
-        // In real implementation, send decline response via WiFi Aware
-      }
-
-      // Notify response callbacks
-      this.notifyResponseCallbacks(requestId, response);
-      
-      // Remove request after response (except for pending)
-      if (response !== "pending") {
-        this.incomingRequests.delete(requestId);
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Failed to respond to request:", error);
-      return false;
-    }
+  async respondToRequest(requestId: string, response: FileRequestResponse, _saveDir?: string) {
+    const req = this.incomingRequests.get(requestId);
+    if (!req) return false;
+    this.notifyResponseCallbacks(requestId, response);
+    if (response !== 'pending') this.incomingRequests.delete(requestId);
+    return true;
   }
 
-  /**
-   * Get all pending incoming requests
-   */
-  getPendingRequests(): IncomingFileRequest[] {
-    return Array.from(this.incomingRequests.values());
+  getPendingRequests() { return Array.from(this.incomingRequests.values()); }
+  getRequest(id: string) { return this.incomingRequests.get(id); }
+  clearPendingRequests() { this.incomingRequests.clear(); }
+
+  onBroadcastStatusChange(cb: () => void) { this.broadcastCallbacks.push(cb); }
+  onIncomingRequest(cb: (r: IncomingFileRequest) => void) { this.requestCallbacks.push(cb); }
+  onRequestResponse(cb: (id: string, r: FileRequestResponse) => void) { this.responseCallbacks.push(cb); }
+  removeCallback(cb: () => void) { this.broadcastCallbacks = this.broadcastCallbacks.filter(f => f !== cb); }
+  removeIncomingRequestCallback(cb: (r: IncomingFileRequest) => void) { this.requestCallbacks = this.requestCallbacks.filter(f => f !== cb); }
+  removeRequestResponseCallback(cb: (id: string, r: FileRequestResponse) => void) {
+    this.responseCallbacks = this.responseCallbacks.filter(f => f !== cb);
   }
 
-  /**
-   * Get a specific request by ID
-   */
-  getRequest(requestId: string): IncomingFileRequest | undefined {
-    return this.incomingRequests.get(requestId);
-  }
+  canReceiveFiles() { return this.settings.enabled && this.settings.visibility !== 'off'; }
 
-  /**
-   * Clear all pending requests
-   */
-  clearPendingRequests(): void {
-    this.incomingRequests.clear();
-  }
-
-  /**
-   * Register callback for broadcast status changes
-   */
-  onBroadcastStatusChange(callback: () => void): void {
-    this.broadcastCallbacks.push(callback);
-  }
-
-  /**
-   * Register callback for incoming file requests
-   */
-  onIncomingRequest(callback: (request: IncomingFileRequest) => void): void {
-    this.requestCallbacks.push(callback);
-  }
-
-  /**
-   * Register callback for request responses
-   */
-  onRequestResponse(callback: (requestId: string, response: FileRequestResponse) => void): void {
-    this.responseCallbacks.push(callback);
-  }
-
-  /**
-   * Remove callback
-   */
-  removeCallback(callback: () => void): void {
-    this.broadcastCallbacks = this.broadcastCallbacks.filter(cb => cb !== callback);
-  }
-
-  /**
-   * Remove incoming request callback
-   */
-  removeIncomingRequestCallback(callback: (request: IncomingFileRequest) => void): void {
-    this.requestCallbacks = this.requestCallbacks.filter(cb => cb !== callback);
-  }
-
-  /**
-   * Remove request response callback
-   */
-  removeRequestResponseCallback(callback: (requestId: string, response: FileRequestResponse) => void): void {
-    this.responseCallbacks = this.responseCallbacks.filter(cb => cb !== callback);
-  }
-
-  /**
-   * Check if device can receive files based on settings
-   */
-  canReceiveFiles(): boolean {
-    return this.settings.enabled && this.settings.visibility !== "off";
-  }
-
-  /**
-   * Get device visibility status for other devices
-   */
   getVisibilityStatus(): string {
-    if (!this.settings.enabled) return "Hidden";
-    if (!this.broadcastingActive) return "Available (Not Broadcasting)";
-    
+    if (!this.settings.enabled) return 'Hidden';
+    if (!this.broadcastingActive) return 'Available (Not Broadcasting)';
     switch (this.settings.visibility) {
-      case "everyone": return "Visible to Everyone";
-      case "contacts": return "Visible to Contacts Only";
-      case "off": return "Hidden";
-      default: return "Unknown";
+      case 'everyone': return 'Visible to Everyone';
+      case 'contacts': return 'Visible to Contacts Only';
+      case 'off': return 'Hidden';
+      default: return 'Unknown';
     }
   }
 
-  // Private methods
-
-  private loadSettings(): void {
+  // ===== internal =====
+  private loadSettings() {
     try {
-      const saved = localStorage.getItem('wifiAwareBroadcastSettings');
-      if (saved) {
-        this.settings = { ...this.settings, ...JSON.parse(saved) };
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('wifiAwareBroadcastSettings');
+        if (saved) this.settings = { ...this.settings, ...JSON.parse(saved) };
       }
-    } catch (error) {
-      console.error("Failed to load broadcast settings:", error);
+    } catch { }
+  }
+
+  private estimateSeconds(files: { size: number }[]) {
+    const total = files.reduce((s, f) => s + (f.size || 0), 0);
+    const avg = 20 * 1024 * 1024; // 20 MB/s
+    return Math.ceil(total / avg);
+  }
+
+  private notifyBroadcastCallbacks() { this.broadcastCallbacks.forEach(cb => { try { cb(); } catch { } }); }
+  private notifyRequestCallbacks(r: IncomingFileRequest) { this.requestCallbacks.forEach(cb => { try { cb(r); } catch { } }); }
+  private notifyResponseCallbacks(id: string, r: FileRequestResponse) { this.responseCallbacks.forEach(cb => { try { cb(id, r); } catch { } }); }
+
+  private async handleTransferOffer(offer: {
+    fromPeerId: string;
+    files: Array<{ id: string; name: string; url: string; type: string }>;
+    messageId?: string;
+  }) {
+    for (const f of offer.files) {
+      await this.saveHttpFile(f.url, f.name);
     }
   }
 
-  private simulateBroadcastingSetup(): void {
-    // Simulate the setup process that would happen with real WiFi Aware
-    setTimeout(() => {
-      console.log("WiFi Aware session established");
-      console.log(`Publishing service: ${this.settings.deviceName}`);
-      console.log(`Visibility: ${this.settings.visibility}`);
-    }, 100);
-  }
-
-  private calculateEstimatedTime(files: FileData[]): number {
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    // Assume average WiFi Aware transfer speed of 20 MB/s
-    const avgSpeed = 20 * 1024 * 1024;
-    return Math.ceil(totalSize / avgSpeed);
-  }
-
-  private generateMockPreview(): string {
-    // Generate a simple mock base64 preview (tiny colored square)
-    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
-  }
-
-  private simulateFileReception(request: IncomingFileRequest, saveLocation?: string): void {
-    // Simulate the file reception process
-    console.log(`Starting file reception from ${request.senderDevice.name}`);
-    console.log(`Files: ${request.files.map(f => f.name).join(", ")}`);
-    if (saveLocation) {
-      console.log(`Save location: ${saveLocation}`);
-    }
-    
-    // In real implementation, this would:
-    // 1. Set up WiFi Aware data session
-    // 2. Create file receiving streams
-    // 3. Handle incoming file data
-    // 4. Save files to specified location
-    // 5. Notify completion
-  }
-
-  private notifyBroadcastCallbacks(): void {
-    this.broadcastCallbacks.forEach(callback => {
-      try {
-        callback();
-      } catch (error) {
-        console.error("Error in broadcast callback:", error);
-      }
-    });
-  }
-
-  private notifyRequestCallbacks(request: IncomingFileRequest): void {
-    this.requestCallbacks.forEach(callback => {
-      try {
-        callback(request);
-      } catch (error) {
-        console.error("Error in request callback:", error);
-      }
-    });
-  }
-
-  private notifyResponseCallbacks(requestId: string, response: FileRequestResponse): void {
-    this.responseCallbacks.forEach(callback => {
-      try {
-        callback(requestId, response);
-      } catch (error) {
-        console.error("Error in response callback:", error);
-      }
+  private async saveHttpFile(url: string, filename: string) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const ab = await blob.arrayBuffer();
+    const data = btoa(String.fromCharCode(...new Uint8Array(ab)));
+    await Filesystem.writeFile({
+      path: `WiFiAware/${Date.now()}-${filename}`,
+      data,
+      directory: Directory.Documents,
+      recursive: true,
     });
   }
 }
 
-// Export convenience functions
 export const getWiFiAwareBroadcastService = () => WiFiAwareBroadcastService.getInstance();
-
 export const startBroadcasting = () => getWiFiAwareBroadcastService().startBroadcasting();
 export const stopBroadcasting = () => getWiFiAwareBroadcastService().stopBroadcasting();
 export const isBroadcasting = () => getWiFiAwareBroadcastService().isBroadcasting();
 
-export const simulateIncomingFileRequest = (
-  senderDevice: DeviceData,
-  files: FileData[],
-  message?: string
-) => getWiFiAwareBroadcastService().simulateIncomingRequest(senderDevice, files, message);
-
 export const respondToFileRequest = (
   requestId: string,
   response: FileRequestResponse,
-  saveLocation?: string
+  saveLocation?: string,
 ) => getWiFiAwareBroadcastService().respondToRequest(requestId, response, saveLocation);

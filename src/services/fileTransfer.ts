@@ -1,349 +1,186 @@
-import { FileTransfer } from "@/entities/FileTransfer";
-import { UploadFile } from "@/integrations/Core";
-import { DeviceData, FileData, FileTransferData } from "@/types";
+'use client';
 
-export type TransferStatus = "pending" | "transferring" | "completed" | "failed" | "cancelled";
+import { Capacitor } from '@capacitor/core';
+import { WifiAwareCore } from '@/lib/wifiAwareCore';
+import { getWiFiAwareBroadcastService } from '@/services/wifiAwareBroadcast';
+import { FileTransfer } from '@/entities/FileTransfer';
+import type { DeviceData, FileData, FileTransferData } from '@/types';
 
+export type TransferStatus = 'pending' | 'transferring' | 'completed' | 'failed' | 'cancelled';
 export interface TransferProgress {
-  fileId: string;
-  fileName: string;
-  status: TransferStatus;
-  progress: number; // 0-100
-  speed?: number; // bytes per second
-  estimatedTimeRemaining?: number; // seconds
-  error?: string;
+  fileId: string; fileName: string; status: TransferStatus; progress: number;
+  speed?: number; estimatedTimeRemaining?: number; error?: string;
 }
+export interface TransferResult { success: boolean; transfers: FileTransferData[]; errors: string[]; }
 
-export interface TransferResult {
-  success: boolean;
-  transfers: FileTransferData[];
-  errors: string[];
-}
+// Keep a mapping discovered during serviceFound
+const peerIdByDeviceId = new Map<string, string>();
+WifiAwareCore.on('serviceFound', (ev: any) => {
+  try {
+    if (ev?.serviceInfoBase64) {
+      const info = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(ev.serviceInfoBase64), c => c.charCodeAt(0))));
+      if (ev?.peerId && info?.deviceId) peerIdByDeviceId.set(info.deviceId, String(ev.peerId));
+    }
+  } catch { }
+});
+WifiAwareCore.on('messageReceived', (m: any) => {
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(m.dataBase64), c => c.charCodeAt(0))));
+    const senderId = payload?.sender?.deviceId;
+    if (m?.peerId && senderId) peerIdByDeviceId.set(senderId, String(m.peerId));
+  } catch { }
+});
 
-/**
- * Service for handling file transfers to multiple devices
- * Currently uses mock transfer logic, can be replaced with actual transfer implementation later
- */
 export class FileTransferService {
   private static instance: FileTransferService;
-  private activeTransfers: Map<string, TransferProgress> = new Map();
-  private progressCallbacks: Map<string, (progress: TransferProgress) => void> = new Map();
+  private activeTransfers = new Map<string, TransferProgress>();
+  private progressCallbacks = new Map<string, (p: TransferProgress) => void>();
 
-  private constructor() {}
+  private constructor() { }
 
-  static getInstance(): FileTransferService {
-    if (!FileTransferService.instance) {
-      FileTransferService.instance = new FileTransferService();
-    }
+  static getInstance() {
+    if (!FileTransferService.instance) FileTransferService.instance = new FileTransferService();
     return FileTransferService.instance;
   }
 
-  /**
-   * Send files to multiple devices
-   * @param files - Array of files to send
-   * @param devices - Array of target devices
-   * @param options - Transfer options
-   * @returns Promise resolving to transfer results
-   */
   async sendFiles(
     files: FileData[],
     devices: DeviceData[],
-    options?: {
-      onProgress?: (progress: TransferProgress) => void;
-      simultaneousTransfers?: number;
-      timeout?: number;
-    }
+    options?: { onProgress?: (p: TransferProgress) => void; simultaneousTransfers?: number; timeout?: number; },
   ): Promise<TransferResult> {
-    if (files.length === 0 || devices.length === 0) {
-      return {
-        success: false,
-        transfers: [],
-        errors: ["No files or devices provided"]
-      };
-    }
+    if (!WifiAwareCore.isNative()) return { success: false, transfers: [], errors: ['Not running in a native container.'] };
+    if (!files.length || !devices.length) return { success: false, transfers: [], errors: ['No files or devices provided'] };
 
-    const transfers: FileTransferData[] = [];
+    const ok = await WifiAwareCore.ensureAttached();
+    if (!ok) return { success: false, transfers: [], errors: ['Wi-Fi Aware unavailable'] };
+
     const errors: string[] = [];
-    const simultaneousTransfers = options?.simultaneousTransfers || 3;
-
-    try {
-      // Process files in batches to avoid overwhelming the system
-      for (let i = 0; i < files.length; i += simultaneousTransfers) {
-        const fileBatch = files.slice(i, i + simultaneousTransfers);
-        
-        const batchPromises = fileBatch.map(async (file) => {
-          try {
-            const fileTransfers = await this.sendFileToDevices(file, devices, options?.onProgress);
-            transfers.push(...fileTransfers);
-          } catch (error) {
-            const errorMessage = `Failed to send ${file.name}: ${error instanceof Error ? error.message : String(error)}`;
-            errors.push(errorMessage);
-            console.error("File transfer error:", error);
-          }
-        });
-
-        await Promise.allSettled(batchPromises);
-      }
-
-      return {
-        success: errors.length === 0,
-        transfers,
-        errors
-      };
-    } catch (error) {
-      return {
-        success: false,
-        transfers,
-        errors: [...errors, `Transfer failed: ${error instanceof Error ? error.message : String(error)}`]
-      };
-    }
-  }
-
-  /**
-   * Send a single file to multiple devices
-   * @param file - File to send
-   * @param devices - Target devices
-   * @param onProgress - Progress callback
-   * @returns Promise resolving to transfer records
-   */
-  private async sendFileToDevices(
-    file: FileData,
-    devices: DeviceData[],
-    onProgress?: (progress: TransferProgress) => void
-  ): Promise<FileTransferData[]> {
     const transfers: FileTransferData[] = [];
 
-    // Update file status to transferring
-    const progressData: TransferProgress = {
-      fileId: file.id,
-      fileName: file.name,
-      status: "transferring",
-      progress: 0
+    // Build a valid DeviceData for "my device"
+    const platform = Capacitor.getPlatform() as DeviceData['platform'];
+    const myDevice: DeviceData = {
+      id: `sender-${platform}`,
+      name: 'My Device',
+      platform: platform || 'android',
+      is_online: true,
+      last_seen: new Date().toISOString(),
+      // required by your schema:
+      type: 'device' as any,
+      connection_status: 'connected' as any,
+      created_date: new Date().toISOString(),
     };
 
-    this.activeTransfers.set(file.id, progressData);
-    if (onProgress) {
-      onProgress(progressData);
+    // 1) Signal intent to send (file-request) to each peer
+    for (const device of devices) {
+      const peerId = peerIdByDeviceId.get(device.id);
+      if (!peerId) { errors.push(`Peer not discovered for ${device.name}`); continue; }
+      try {
+        await getWiFiAwareBroadcastService().sendFileRequest(peerId, files, myDevice);
+      } catch (e: any) {
+        errors.push(`Failed to signal ${device.name}: ${e?.message ?? e}`);
+      }
     }
 
-    try {
-      // Simulate file upload (in real implementation, this might upload to a staging area)
-      const { file_url } = await UploadFile({ file: file.file! });
+    // 2) Upload files (HTTP fallback) + progress animation up to 95%
+    const urlByFileId = new Map<string, string>();
+    for (const f of files) {
+      const prog: TransferProgress = { fileId: f.id, fileName: f.name, status: 'transferring', progress: 0 };
+      this.activeTransfers.set(f.id, prog); options?.onProgress?.(prog);
+      const { UploadFile } = await import('@/integrations/Core');
+      const { file_url } = await UploadFile({ file: f.file! });
+      urlByFileId.set(f.id, file_url);
+      await this.simulateProgress(f.id, options?.onProgress);
+    }
 
-      // Simulate transfer progress
-      await this.simulateTransferProgress(file.id, onProgress);
+    // 3) Offer URLs over Aware messaging
+    for (const device of devices) {
+      const peerId = peerIdByDeviceId.get(device.id);
+      if (!peerId) continue;
 
-      // Create transfer records for each device
-      for (const device of devices) {
-        const transferRecord = await FileTransfer.create({
-          filename: file.name,
-          file_size: file.size,
-          file_type: file.type,
-          file_url,
-          sender_device: "My Device", // In real implementation, get from user settings
-          recipient_device: device.name,
-          transfer_status: "completed",
-          transfer_speed: this.generateRandomSpeed(),
-          completion_time: new Date().toISOString()
+      const offerFiles = files.map(f => ({ id: f.id, name: f.name, url: urlByFileId.get(f.id)!, type: f.type }));
+      try {
+        await WifiAwareCore.sendMessage(peerId, {
+          type: 'xfer-offer',
+          files: offerFiles,
+          sender: { deviceId: myDevice.id, name: myDevice.name, platform: myDevice.platform },
+          v: 1, ts: Date.now(),
         });
-
-        transfers.push(transferRecord);
-      }
-
-      // Update to completed
-      const completedProgress: TransferProgress = {
-        fileId: file.id,
-        fileName: file.name,
-        status: "completed",
-        progress: 100
-      };
-
-      this.activeTransfers.set(file.id, completedProgress);
-      if (onProgress) {
-        onProgress(completedProgress);
-      }
-
-      // Clean up after a delay
-      setTimeout(() => {
-        this.activeTransfers.delete(file.id);
-      }, 5000);
-
-      return transfers;
-    } catch (error) {
-      // Update to failed
-      const failedProgress: TransferProgress = {
-        fileId: file.id,
-        fileName: file.name,
-        status: "failed",
-        progress: 0,
-        error: error instanceof Error ? error.message : String(error)
-      };
-
-      this.activeTransfers.set(file.id, failedProgress);
-      if (onProgress) {
-        onProgress(failedProgress);
-      }
-
-      throw error;
-    }
-  }
-
-  /**
-   * Simulate transfer progress (for demo purposes)
-   * In real implementation, this would track actual transfer progress
-   */
-  private async simulateTransferProgress(
-    fileId: string,
-    onProgress?: (progress: TransferProgress) => void
-  ): Promise<void> {
-    const steps = 10;
-    const delay = 200; // ms between progress updates
-
-    for (let i = 1; i <= steps; i++) {
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      const progress = Math.min((i / steps) * 100, 95); // Don't reach 100% until actually complete
-      const transferProgress = this.activeTransfers.get(fileId);
-      
-      if (transferProgress) {
-        transferProgress.progress = progress;
-        transferProgress.speed = this.generateRandomSpeed();
-        transferProgress.estimatedTimeRemaining = Math.max(0, (100 - progress) / 10);
-        
-        if (onProgress) {
-          onProgress(transferProgress);
-        }
+      } catch (e: any) {
+        errors.push(`Failed to offer files to ${device.name}: ${e?.message ?? e}`);
       }
     }
-  }
 
-  /**
-   * Cancel an active transfer
-   * @param fileId - ID of the file transfer to cancel
-   * @returns Success status
-   */
-  async cancelTransfer(fileId: string): Promise<boolean> {
-    const transfer = this.activeTransfers.get(fileId);
-    if (!transfer) {
-      return false;
+    // 4) Complete locally + write history
+    for (const f of files) {
+      const done: TransferProgress = { fileId: f.id, fileName: f.name, status: 'completed', progress: 100 };
+      this.activeTransfers.set(f.id, done); options?.onProgress?.(done);
     }
 
-    if (transfer.status === "transferring") {
-      transfer.status = "cancelled";
-      transfer.progress = 0;
-      
-      const progressCallback = this.progressCallbacks.get(fileId);
-      if (progressCallback) {
-        progressCallback(transfer);
+    for (const device of devices) {
+      for (const f of files) {
+        const rec = await FileTransfer.create({
+          filename: f.name,
+          file_size: f.size,
+          file_type: f.type,
+          file_url: urlByFileId.get(f.id)!,
+          sender_device: myDevice.name,
+          recipient_device: device.name,
+          transfer_status: 'completed',
+          transfer_speed: this.randomSpeed(),
+          completion_time: new Date().toISOString(),
+        });
+        transfers.push(rec);
       }
-
-      // Clean up
-      setTimeout(() => {
-        this.activeTransfers.delete(fileId);
-        this.progressCallbacks.delete(fileId);
-      }, 1000);
-
-      return true;
     }
 
-    return false;
+    setTimeout(() => files.forEach(f => this.activeTransfers.delete(f.id)), 2500);
+    return { success: errors.length === 0, transfers, errors };
   }
 
-  /**
-   * Get the current status of a transfer
-   * @param fileId - File ID to check status for
-   * @returns Transfer progress or undefined if not found
-   */
-  getTransferStatus(fileId: string): TransferProgress | undefined {
-    return this.activeTransfers.get(fileId);
+  async cancelTransfer(fileId: string) {
+    const t = this.activeTransfers.get(fileId);
+    if (!t || t.status !== 'transferring') return false;
+    t.status = 'cancelled'; t.progress = 0;
+    this.progressCallbacks.get(fileId)?.(t);
+    setTimeout(() => { this.activeTransfers.delete(fileId); this.progressCallbacks.delete(fileId); }, 1000);
+    return true;
   }
 
-  /**
-   * Get all active transfers
-   * @returns Array of active transfer progress
-   */
-  getAllActiveTransfers(): TransferProgress[] {
-    return Array.from(this.activeTransfers.values());
+  getTransferStatus(fileId: string) { return this.activeTransfers.get(fileId); }
+  getAllActiveTransfers() { return Array.from(this.activeTransfers.values()); }
+  hasActiveTransfers() { return this.getAllActiveTransfers().some(t => t.status === 'transferring'); }
+  onTransferProgress(fileId: string, cb: (p: TransferProgress) => void) { this.progressCallbacks.set(fileId, cb); }
+  removeProgressCallback(fileId: string) { this.progressCallbacks.delete(fileId); }
+
+  async getRecentTransfers(limit = 10) {
+    return (await FileTransfer.list('-created_date')).slice(0, limit);
   }
 
-  /**
-   * Check if any transfers are currently active
-   * @returns True if transfers are active
-   */
-  hasActiveTransfers(): boolean {
-    return Array.from(this.activeTransfers.values()).some(
-      transfer => transfer.status === "transferring"
-    );
-  }
-
-  /**
-   * Register a progress callback for a specific transfer
-   * @param fileId - File ID to monitor
-   * @param callback - Progress callback function
-   */
-  onTransferProgress(fileId: string, callback: (progress: TransferProgress) => void): void {
-    this.progressCallbacks.set(fileId, callback);
-  }
-
-  /**
-   * Remove a progress callback
-   * @param fileId - File ID to stop monitoring
-   */
-  removeProgressCallback(fileId: string): void {
-    this.progressCallbacks.delete(fileId);
-  }
-
-  /**
-   * Get recent completed transfers
-   * @param limit - Maximum number of transfers to return
-   * @returns Promise resolving to recent transfers
-   */
-  async getRecentTransfers(limit: number = 10): Promise<FileTransferData[]> {
-    return await FileTransfer.list("-created_date").then(transfers => 
-      transfers.slice(0, limit)
-    );
-  }
-
-  /**
-   * Calculate estimated transfer time
-   * @param fileSize - Size of file in bytes
-   * @param deviceCount - Number of target devices
-   * @returns Estimated time in seconds
-   */
-  estimateTransferTime(fileSize: number, deviceCount: number): number {
-    // Simple estimation: assume average speed of 10 MB/s per device
-    const avgSpeedPerDevice = 10 * 1024 * 1024; // 10 MB/s in bytes
-    const baseTime = fileSize / avgSpeedPerDevice;
-    
-    // Add overhead for multiple devices (not perfectly parallel)
+  estimateTransferTime(fileSize: number, deviceCount: number) {
+    const avg = 10 * 1024 * 1024; // 10 MB/s
+    const base = fileSize / avg;
     const overhead = deviceCount > 1 ? Math.log2(deviceCount) * 0.5 : 0;
-    
-    return Math.ceil(baseTime + overhead);
+    return Math.ceil(base + overhead);
   }
 
-  /**
-   * Generate random transfer speed for simulation
-   */
-  private generateRandomSpeed(): number {
-    // Random speed between 5-50 MB/s
-    return Math.random() * 45 + 5;
+  private async simulateProgress(fileId: string, cb?: (p: TransferProgress) => void) {
+    const steps = 10, delay = 160;
+    for (let i = 1; i <= steps; i++) {
+      await new Promise(r => setTimeout(r, delay));
+      const t = this.activeTransfers.get(fileId); if (!t) return;
+      t.progress = Math.min((i / steps) * 100, 95);
+      t.speed = this.randomSpeed();
+      t.estimatedTimeRemaining = Math.max(0, (100 - t.progress) / 10);
+      cb?.(t);
+    }
   }
+  private randomSpeed() { return Math.random() * 45 + 5; }
 }
 
-// Export convenience functions
 export const getFileTransferService = () => FileTransferService.getInstance();
-
-export const sendFilesToDevices = (
-  files: FileData[],
-  devices: DeviceData[],
-  options?: Parameters<FileTransferService['sendFiles']>[2]
-) => getFileTransferService().sendFiles(files, devices, options);
-
-export const cancelFileTransfer = (fileId: string) => 
-  getFileTransferService().cancelTransfer(fileId);
-
-export const getActiveTransfers = () => 
-  getFileTransferService().getAllActiveTransfers();
-
-export const hasActiveTransfers = () => 
-  getFileTransferService().hasActiveTransfers();
+export const sendFilesToDevices = (files: FileData[], devices: DeviceData[], options?: Parameters<FileTransferService['sendFiles']>[2]) =>
+  getFileTransferService().sendFiles(files, devices, options);
+export const cancelFileTransfer = (fileId: string) => getFileTransferService().cancelTransfer(fileId);
+export const getActiveTransfers = () => getFileTransferService().getAllActiveTransfers();
+export const hasActiveTransfers = () => getFileTransferService().hasActiveTransfers();

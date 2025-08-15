@@ -1,178 +1,156 @@
-import { Device } from "@/entities/Device";
-import { DeviceData } from "@/types";
+'use client';
 
-/**
- * Service for discovering and managing nearby devices
- * Currently returns mock data, can be replaced with actual device discovery logic later
- */
+import { WifiAwareCore, jsonFromB64 } from '@/lib/wifiAwareCore';
+import { completeDeviceData } from '@/lib/deviceAdapters';
+import type { DeviceData } from '@/types';
+import { Capacitor } from '@capacitor/core';
+
+// Internal shape (what we store), not exported
+type Peer = {
+  peerId: string;
+  distanceMm?: number;
+  updatedAt: number;     // internal only
+  data: DeviceData;      // finalized, UI-ready record
+};
+
 export class DeviceDiscoveryService {
   private static instance: DeviceDiscoveryService;
-  private devices: DeviceData[] = [];
+  private peers = new Map<string, Peer>();
   private isScanning = false;
-  private scanCallbacks: (() => void)[] = [];
+  private scanCallbacks: Array<() => void> = [];
+  private disposers: Array<{ remove: () => Promise<void> }> = [];
 
-  private constructor() {}
+  private constructor() { }
 
-  static getInstance(): DeviceDiscoveryService {
+  static getInstance() {
     if (!DeviceDiscoveryService.instance) {
       DeviceDiscoveryService.instance = new DeviceDiscoveryService();
     }
     return DeviceDiscoveryService.instance;
   }
 
-  /**
-   * Get all discovered devices
-   * @param sort - Sort order ("-last_seen" for newest first)
-   * @returns Promise resolving to array of devices
-   */
-  async getAllDevices(sort?: "-last_seen"): Promise<DeviceData[]> {
-    // For now, use the existing Device entity mock data
-    const devices = await Device.list(sort);
-    this.devices = devices;
-    return devices;
+  async getAllDevices(sort?: '-last_seen'): Promise<DeviceData[]> {
+    const list = Array.from(this.peers.values()).map(p => p.data);
+    if (sort === '-last_seen') {
+      return list.sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
+    }
+    return list;
   }
 
-  /**
-   * Get only devices that are currently online/active
-   * @returns Promise resolving to array of online devices
-   */
   async getActiveDevices(): Promise<DeviceData[]> {
-    const allDevices = await this.getAllDevices("-last_seen");
-    return allDevices.filter(device => device.is_online);
+    const now = Date.now();
+    const freshMs = 40_000;
+    return Array.from(this.peers.values())
+      .filter(p => now - p.updatedAt < freshMs)
+      .map(p => p.data)
+      .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
   }
 
-  /**
-   * Get devices that are offline but recently seen
-   * @returns Promise resolving to array of offline devices
-   */
   async getRecentDevices(): Promise<DeviceData[]> {
-    const allDevices = await this.getAllDevices("-last_seen");
-    return allDevices.filter(device => !device.is_online);
+    const now = Date.now();
+    const freshMs = 40_000;
+    return Array.from(this.peers.values())
+      .filter(p => now - p.updatedAt >= freshMs)
+      .map(p => p.data)
+      .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
   }
 
-  /**
-   * Start scanning for nearby devices
-   * @param duration - Scan duration in milliseconds (default: 2000ms)
-   * @returns Promise that resolves when scan is complete
-   */
-  async startScan(duration: number = 2000): Promise<DeviceData[]> {
-    if (this.isScanning) {
-      return this.devices;
-    }
+  async startScan(durationMs = 8000): Promise<DeviceData[]> {
+    if (!WifiAwareCore.isNative()) return [];
+    if (this.isScanning) return this.getActiveDevices();
 
-    this.isScanning = true;
-    this.notifyScanCallbacks();
+    this.isScanning = true; this.notify();
 
-    return new Promise((resolve) => {
-      setTimeout(async () => {
-        // Simulate device discovery by updating device statuses
-        await this.simulateDeviceUpdate();
-        
-        this.isScanning = false;
-        this.notifyScanCallbacks();
-        
-        const activeDevices = await this.getActiveDevices();
-        resolve(activeDevices);
-      }, duration);
-    });
-  }
+    const ok = await WifiAwareCore.ensureAttached();
+    if (!ok) { this.isScanning = false; this.notify(); return []; }
 
-  /**
-   * Check if currently scanning for devices
-   * @returns Current scanning status
-   */
-  isCurrentlyScanning(): boolean {
-    return this.isScanning;
-  }
+    await WifiAwareCore.subscribe();
 
-  /**
-   * Register a callback to be notified when scan status changes
-   * @param callback - Function to call when scan status changes
-   */
-  onScanStatusChange(callback: () => void): void {
-    this.scanCallbacks.push(callback);
-  }
+    // Found
+    this.disposers.push(
+      await WifiAwareCore.on('serviceFound', (ev) => {
+        // ev: { peerId, serviceName, distanceMm?, serviceInfoBase64? }
+        const peerId = String(ev.peerId);
+        let name = 'Unknown';
+        let platform: DeviceData['platform'] = 'android';
+        let deviceId = peerId;
 
-  /**
-   * Remove a scan status callback
-   * @param callback - Callback function to remove
-   */
-  removeScanStatusCallback(callback: () => void): void {
-    this.scanCallbacks = this.scanCallbacks.filter(cb => cb !== callback);
-  }
+        try {
+          if (ev.serviceInfoBase64) {
+            const info = jsonFromB64<any>(ev.serviceInfoBase64);
+            name = info?.name ?? name;
+            platform = info?.platform ?? platform;
+            deviceId = info?.deviceId ?? deviceId;
+          }
+        } catch { }
 
-  /**
-   * Simulate device status updates (for demo purposes)
-   * In a real implementation, this would be replaced with actual device discovery logic
-   */
-  private async simulateDeviceUpdate(): Promise<void> {
-    const devices = await Device.list("-last_seen");
-    
-    // Simulate some devices coming online/offline
-    const updatedDevices = devices.map(device => ({
-      ...device,
-      is_online: Math.random() > 0.3, // 70% chance of being online
-      last_seen: new Date().toISOString(),
-    }));
+        const now = Date.now();
+        const data = completeDeviceData({
+          id: deviceId,
+          name,
+          platform,
+          is_online: true,
+          last_seen: new Date(now).toISOString(),
+        });
 
-    this.devices = updatedDevices;
-    // Note: In a real implementation, you'd update the actual device storage here
-  }
+        this.peers.set(peerId, {
+          peerId,
+          distanceMm: ev.distanceMm,
+          updatedAt: now,
+          data,
+        });
 
-  /**
-   * Filter devices by search term
-   * @param searchTerm - Search term to filter by device name
-   * @param devices - Optional devices array, if not provided uses current devices
-   * @returns Filtered devices
-   */
-  filterDevices(searchTerm: string, devices?: DeviceData[]): DeviceData[] {
-    const devicesToFilter = devices || this.devices;
-    if (!searchTerm.trim()) {
-      return devicesToFilter;
-    }
-    
-    return devicesToFilter.filter(device =>
-      device.name.toLowerCase().includes(searchTerm.toLowerCase())
+        this.notify();
+      })
     );
+
+    // Lost
+    this.disposers.push(
+      await WifiAwareCore.on('serviceLost', (ev) => {
+        const peerId = String(ev.peerId);
+        const rec = this.peers.get(peerId);
+        if (!rec) return;
+        const now = Date.now();
+        rec.updatedAt = now;
+        rec.data = {
+          ...rec.data,
+          is_online: false,
+          last_seen: new Date(now).toISOString(),
+        };
+        this.notify();
+      })
+    );
+
+    await new Promise(res => setTimeout(res, durationMs));
+    try { await WifiAwareCore.stopAll(); } catch { }
+    this.isScanning = false; this.notify();
+
+    return this.getActiveDevices();
   }
 
-  /**
-   * Get device statistics
-   * @returns Object containing device counts and statistics
-   */
-  async getDeviceStats(): Promise<{
-    total: number;
-    online: number;
-    offline: number;
-    lastScanTime?: Date;
-  }> {
-    const allDevices = await this.getAllDevices();
-    const onlineDevices = allDevices.filter(d => d.is_online);
-    const offlineDevices = allDevices.filter(d => !d.is_online);
+  isCurrentlyScanning() { return this.isScanning; }
 
-    return {
-      total: allDevices.length,
-      online: onlineDevices.length,
-      offline: offlineDevices.length,
-      lastScanTime: this.isScanning ? undefined : new Date()
-    };
+  onScanStatusChange(cb: () => void) { this.scanCallbacks.push(cb); }
+  removeScanStatusCallback(cb: () => void) { this.scanCallbacks = this.scanCallbacks.filter(f => f !== cb); }
+
+  async getDeviceStats() {
+    const all = await this.getAllDevices();
+    const now = Date.now();
+    const freshMs = 40_000;
+    const online = all.filter(d => now - new Date(d.last_seen).getTime() < freshMs).length;
+    return { total: all.length, online, offline: all.length - online, lastScanTime: this.isScanning ? undefined : new Date() };
   }
 
-  private notifyScanCallbacks(): void {
-    this.scanCallbacks.forEach(callback => {
-      try {
-        callback();
-      } catch (error) {
-        console.error('Error in scan status callback:', error);
-      }
-    });
+  filterDevices(search: string, devices?: DeviceData[]) {
+    const source = devices ?? Array.from(this.peers.values()).map(p => p.data);
+    if (!search.trim()) return source;
+    return source.filter(d => d.name.toLowerCase().includes(search.toLowerCase()));
   }
+
+  private notify() { this.scanCallbacks.forEach(cb => { try { cb(); } catch { } }); }
 }
 
-// Export a convenience function for getting the service instance
 export const getDeviceDiscoveryService = () => DeviceDiscoveryService.getInstance();
-
-// Export convenience functions for common operations
 export const getActiveDevices = () => getDeviceDiscoveryService().getActiveDevices();
-export const getAllDevices = (sort?: "-last_seen") => getDeviceDiscoveryService().getAllDevices(sort);
-export const startDeviceScan = (duration?: number) => getDeviceDiscoveryService().startScan(duration);
+export const getAllDevices = (sort?: '-last_seen') => getDeviceDiscoveryService().getAllDevices(sort);
+export const startDeviceScan = (ms?: number) => getDeviceDiscoveryService().startScan(ms);
