@@ -3,7 +3,7 @@
 
 import { WifiAwareCore, jsonFromB64 } from '@/lib/wifiAwareCore';
 import { completeDeviceData } from '@/lib/deviceAdapters';
-import type { DeviceData, FileData } from '@/types';
+import type { DeviceData, FileData, FileTransferResult, NativeFileTransferProgress } from '@/types';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 export interface IncomingFileRequest {
@@ -42,9 +42,12 @@ export class WiFiAwareBroadcastService {
   };
 
   private incomingRequests = new Map<string, IncomingFileRequest>();
+  private activeTransfers = new Map<string, NativeFileTransferProgress>();
   private broadcastCallbacks: Array<() => void> = [];
   private requestCallbacks: Array<(r: IncomingFileRequest) => void> = [];
   private responseCallbacks: Array<(id: string, r: FileRequestResponse) => void> = [];
+  private transferProgressCallbacks: Array<(p: NativeFileTransferProgress) => void> = [];
+  private transferCompletedCallbacks: Array<(r: FileTransferResult) => void> = [];
   private disposers: Array<{ remove: () => Promise<void> }> = [];
   private myDeviceId = crypto.randomUUID();
 
@@ -62,10 +65,12 @@ export class WiFiAwareBroadcastService {
     if (!WifiAwareCore.isNative()) return false;
     if (this.broadcastingActive) return true;
 
-    const ok = await WifiAwareCore.ensureAttached();
-    if (!ok) return false;
+    const result = await WifiAwareCore.ensureAttached();
+    if (!result.available) return false;
 
-    // Message handler: file-request & xfer-offer
+    // Set up all event listeners for the WiFi Aware API
+    
+    // Message handler for legacy file-request & xfer-offer
     this.disposers.push(
       await WifiAwareCore.on('messageReceived', async (m: any) => {
         const peerId = String(m?.peerId ?? '');
@@ -106,27 +111,81 @@ export class WiFiAwareBroadcastService {
             await this.respondToRequest(reqId, 'accept');
           }
         }
-
-        if (msg?.type === 'xfer-offer' && Array.isArray(msg.files)) {
-          await this.handleTransferOffer({
-            fromPeerId: peerId,
-            files: msg.files.map((f: any) => ({
-              id: String(f.id),
-              name: String(f.name),
-              url: String(f.url),
-              type: String(f.type ?? 'application/octet-stream'),
-            })),
-            messageId: msg.messageId,
-          });
-        }
       }),
     );
+    
+    // Native file transfer request handler
+    this.disposers.push(
+      await WifiAwareCore.on('fileTransferRequest', async (req) => {
+        const { peerId, transferId, fileName, mimeType, fileSize } = req;
+        const now = new Date();
+        
+        // Try to get device info for the sender
+        let deviceInfo: any = null;
+        try {
+          deviceInfo = await WifiAwareCore.getDeviceInfo(peerId);
+        } catch (error) {
+          console.error('Error getting device info:', error);
+        }
+        
+        const sender = completeDeviceData({
+          id: peerId,
+          name: deviceInfo?.deviceName || 'Unknown Device',
+          type: deviceInfo?.deviceType?.toLowerCase() || 'unknown',
+          platform: this.mapDeviceTypeToPlatform(deviceInfo?.deviceType),
+          is_online: true,
+          last_seen: now.toISOString(),
+          modelName: deviceInfo?.modelName,
+          osVersion: deviceInfo?.osVersion,
+        });
+        
+        const fileRequest: IncomingFileRequest = {
+          id: transferId,
+          senderDevice: sender,
+          files: [{
+            id: transferId,
+            name: fileName,
+            size: fileSize,
+            type: mimeType || 'application/octet-stream',
+          }],
+          timestamp: now,
+          estimatedTransferTime: this.estimateSeconds([{ size: fileSize }]),
+        };
+        
+        this.incomingRequests.set(transferId, fileRequest);
+        this.notifyRequestCallbacks(fileRequest);
+        
+        if (this.settings.autoAcceptFromTrustedDevices && trustedDeviceIds.has(sender.id)) {
+          await this.respondToRequest(transferId, 'accept');
+        }
+      })
+    );
+    
+    // File transfer progress handler
+    this.disposers.push(
+      await WifiAwareCore.on('fileTransferProgress', (progress) => {
+        this.activeTransfers.set(progress.transferId, progress);
+        this.transferProgressCallbacks.forEach(cb => { 
+          try { cb(progress); } catch { } 
+        });
+      })
+    );
+    
+    // File transfer completion handler
+    this.disposers.push(
+      await WifiAwareCore.on('fileTransferCompleted', (result) => {
+        this.activeTransfers.delete(result.transferId);
+        this.transferCompletedCallbacks.forEach(cb => { 
+          try { cb(result); } catch { } 
+        });
+      })
+    );
 
-    // Publish our presence
+    // Publish our presence with device info
     await WifiAwareCore.publish({
       deviceId: this.myDeviceId,
       name: this.settings.deviceName,
-      platform: 'android',
+      platform: result.deviceName || 'unknown',
       visibility: this.settings.visibility,
       allowPreview: this.settings.allowPreview,
       v: 1,
@@ -137,6 +196,19 @@ export class WiFiAwareBroadcastService {
     this.notifyBroadcastCallbacks();
     return true;
   }
+  
+  private mapDeviceTypeToPlatform(deviceType?: string): DeviceData['platform'] {
+    if (!deviceType) return 'android';
+    
+    const type = deviceType.toLowerCase();
+    if (type.includes('iphone') || type.includes('ipad') || type.includes('ipod')) return 'ios';
+    if (type.includes('android')) return 'android';
+    if (type.includes('windows')) return 'windows';
+    if (type.includes('mac') || type.includes('osx')) return 'macos';
+    if (type.includes('linux')) return 'linux';
+    
+    return 'android'; // Default fallback
+  }
 
   async stopBroadcasting(): Promise<boolean> {
     if (!this.broadcastingActive) return true;
@@ -145,6 +217,7 @@ export class WiFiAwareBroadcastService {
       this.broadcastingActive = false;
       await Promise.allSettled(this.disposers.map(d => d.remove()));
       this.disposers = [];
+      this.activeTransfers.clear();
       this.notifyBroadcastCallbacks();
       return true;
     } catch { return false; }
@@ -171,6 +244,29 @@ export class WiFiAwareBroadcastService {
   getSettings(): BroadcastSettings { return { ...this.settings }; }
 
   async sendFileRequest(toPeerId: string, files: FileData[], sender: DeviceData, message?: string) {
+    // If we have the new file transfer API, use it for each file
+    if (WifiAwareCore.isNative()) {
+      for (const file of files) {
+        if (file.file) {
+          try {
+            // Convert the file to a base64 string
+            const fileBase64 = await this.fileToBase64(file.file);
+            // Send the file using the native API
+            await WifiAwareCore.sendFile({
+              peerId: toPeerId,
+              fileBase64,
+              fileName: file.name,
+              mimeType: file.type
+            });
+          } catch (error) {
+            console.error(`Error sending file ${file.name}:`, error);
+          }
+        }
+      }
+      return;
+    }
+    
+    // Fallback to legacy message-based request
     const payload = {
       type: 'file-request',
       sender: { deviceId: sender.id, name: sender.name, platform: sender.platform },
@@ -182,25 +278,69 @@ export class WiFiAwareBroadcastService {
     await WifiAwareCore.sendMessage(toPeerId, payload);
   }
 
-  async respondToRequest(requestId: string, response: FileRequestResponse, _saveDir?: string) {
+  async respondToRequest(requestId: string, response: FileRequestResponse) {
     const req = this.incomingRequests.get(requestId);
     if (!req) return false;
+    
     this.notifyResponseCallbacks(requestId, response);
-    if (response !== 'pending') this.incomingRequests.delete(requestId);
+    
+    // If using native API, we need to handle file transfer responses
+    if (response === 'accept') {
+      try {
+        // No need to handle save path here as the WifiAwareCore will handle it automatically
+        // We're just accepting the transfer by sending a confirmation message
+        await WifiAwareCore.sendMessage(req.senderDevice.id, {
+          type: 'file-accept',
+          requestId,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        console.error('Error accepting file transfer:', error);
+      }
+      } else if (response === 'decline') {
+      try {
+        await WifiAwareCore.cancelFileTransfer(requestId);
+      } catch (error) {
+        console.error('Error declining file transfer:', error);
+      }
+    }    if (response !== 'pending') this.incomingRequests.delete(requestId);
     return true;
+  }
+
+  async cancelFileTransfer(transferId: string) {
+    try {
+      await WifiAwareCore.cancelFileTransfer(transferId);
+      return true;
+    } catch (error) {
+      console.error('Error cancelling file transfer:', error);
+      return false;
+    }
   }
 
   getPendingRequests() { return Array.from(this.incomingRequests.values()); }
   getRequest(id: string) { return this.incomingRequests.get(id); }
+  getTransferProgress(transferId: string) { return this.activeTransfers.get(transferId); }
+  getAllTransfers() { return Array.from(this.activeTransfers.values()); }
   clearPendingRequests() { this.incomingRequests.clear(); }
 
   onBroadcastStatusChange(cb: () => void) { this.broadcastCallbacks.push(cb); }
   onIncomingRequest(cb: (r: IncomingFileRequest) => void) { this.requestCallbacks.push(cb); }
   onRequestResponse(cb: (id: string, r: FileRequestResponse) => void) { this.responseCallbacks.push(cb); }
+  onTransferProgress(cb: (p: NativeFileTransferProgress) => void) { this.transferProgressCallbacks.push(cb); }
+  onTransferCompleted(cb: (r: FileTransferResult) => void) { this.transferCompletedCallbacks.push(cb); }
+  
   removeCallback(cb: () => void) { this.broadcastCallbacks = this.broadcastCallbacks.filter(f => f !== cb); }
-  removeIncomingRequestCallback(cb: (r: IncomingFileRequest) => void) { this.requestCallbacks = this.requestCallbacks.filter(f => f !== cb); }
+  removeIncomingRequestCallback(cb: (r: IncomingFileRequest) => void) { 
+    this.requestCallbacks = this.requestCallbacks.filter(f => f !== cb); 
+  }
   removeRequestResponseCallback(cb: (id: string, r: FileRequestResponse) => void) {
     this.responseCallbacks = this.responseCallbacks.filter(f => f !== cb);
+  }
+  removeTransferProgressCallback(cb: (p: NativeFileTransferProgress) => void) {
+    this.transferProgressCallbacks = this.transferProgressCallbacks.filter(f => f !== cb);
+  }
+  removeTransferCompletedCallback(cb: (r: FileTransferResult) => void) {
+    this.transferCompletedCallbacks = this.transferCompletedCallbacks.filter(f => f !== cb);
   }
 
   canReceiveFiles() { return this.settings.enabled && this.settings.visibility !== 'off'; }
@@ -214,6 +354,20 @@ export class WiFiAwareBroadcastService {
       case 'off': return 'Hidden';
       default: return 'Unknown';
     }
+  }
+  
+  private async fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data URL prefix (e.g., "data:image/png;base64,")
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = (error) => reject(error);
+    });
   }
 
   // ===== internal =====
@@ -241,22 +395,27 @@ export class WiFiAwareBroadcastService {
     files: Array<{ id: string; name: string; url: string; type: string }>;
     messageId?: string;
   }) {
+    // This is for legacy support - the new API handles file saving directly
     for (const f of offer.files) {
       await this.saveHttpFile(f.url, f.name);
     }
   }
 
   private async saveHttpFile(url: string, filename: string) {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const ab = await blob.arrayBuffer();
-    const data = btoa(String.fromCharCode(...new Uint8Array(ab)));
-    await Filesystem.writeFile({
-      path: `WiFiAware/${Date.now()}-${filename}`,
-      data,
-      directory: Directory.Documents,
-      recursive: true,
-    });
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const ab = await blob.arrayBuffer();
+      const data = btoa(String.fromCharCode(...new Uint8Array(ab)));
+      await Filesystem.writeFile({
+        path: `WiFiAware/${Date.now()}-${filename}`,
+        data,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+    } catch (error) {
+      console.error(`Error saving file ${filename}:`, error);
+    }
   }
 }
 
@@ -268,5 +427,13 @@ export const isBroadcasting = () => getWiFiAwareBroadcastService().isBroadcastin
 export const respondToFileRequest = (
   requestId: string,
   response: FileRequestResponse,
-  saveLocation?: string,
-) => getWiFiAwareBroadcastService().respondToRequest(requestId, response, saveLocation);
+) => getWiFiAwareBroadcastService().respondToRequest(requestId, response);
+
+export const cancelFileTransfer = (transferId: string) => 
+  getWiFiAwareBroadcastService().cancelFileTransfer(transferId);
+  
+export const getTransferProgress = (transferId: string) =>
+  getWiFiAwareBroadcastService().getTransferProgress(transferId);
+
+export const getAllTransfers = () =>
+  getWiFiAwareBroadcastService().getAllTransfers();

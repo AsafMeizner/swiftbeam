@@ -3,7 +3,7 @@
 import { WifiAwareCore, jsonFromB64 } from '@/lib/wifiAwareCore';
 import { completeDeviceData } from '@/lib/deviceAdapters';
 import type { DeviceData } from '@/types';
-import { Capacitor } from '@capacitor/core';
+// Capacitor import removed as it's not needed
 
 // Internal shape (what we store), not exported
 type Peer = {
@@ -21,6 +21,31 @@ export class DeviceDiscoveryService {
   private disposers: Array<{ remove: () => Promise<void> }> = [];
 
   private constructor() { }
+  
+  private mapDeviceTypeString(deviceType?: string): DeviceData['type'] {
+    if (!deviceType) return 'unknown';
+    
+    const type = deviceType.toLowerCase();
+    if (type.includes('phone') || type.includes('iphone') || type.includes('android')) return 'phone';
+    if (type.includes('tablet') || type.includes('ipad')) return 'tablet';
+    if (type.includes('computer') || type.includes('desktop')) return 'desktop';
+    if (type.includes('laptop')) return 'laptop';
+    
+    return 'unknown';
+  }
+  
+  private mapDeviceTypeToPlatform(deviceType?: string): DeviceData['platform'] {
+    if (!deviceType) return 'android';
+    
+    const type = deviceType.toLowerCase();
+    if (type.includes('iphone') || type.includes('ipad') || type.includes('ipod') || type.includes('ios')) return 'ios';
+    if (type.includes('android')) return 'android';
+    if (type.includes('windows')) return 'windows';
+    if (type.includes('mac') || type.includes('osx')) return 'macos';
+    if (type.includes('linux')) return 'linux';
+    
+    return 'android'; // Default fallback
+  }
 
   static getInstance() {
     if (!DeviceDiscoveryService.instance) {
@@ -68,19 +93,39 @@ export class DeviceDiscoveryService {
 
     // Found
     this.disposers.push(
-      await WifiAwareCore.on('serviceFound', (ev) => {
+      await WifiAwareCore.on('serviceFound', async (ev) => {
         // ev: { peerId, serviceName, distanceMm?, serviceInfoBase64? }
         const peerId = String(ev.peerId);
         let name = 'Unknown';
         let platform: DeviceData['platform'] = 'android';
         let deviceId = peerId;
+        let deviceType: DeviceData['type'] = 'unknown';
+        let modelName: string | undefined;
+        let osVersion: string | undefined;
 
+        // First try to get device info from the native API
+        try {
+          if (WifiAwareCore.isNative()) {
+            const deviceInfo = await WifiAwareCore.getDeviceInfo(peerId);
+            if (deviceInfo) {
+              name = deviceInfo.deviceName || name;
+              deviceType = this.mapDeviceTypeString(deviceInfo.deviceType);
+              platform = this.mapDeviceTypeToPlatform(deviceInfo.deviceType) || platform;
+              modelName = deviceInfo.modelName;
+              osVersion = deviceInfo.osVersion;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching device info:', error);
+        }
+
+        // Fallback to legacy info from serviceInfoBase64
         try {
           if (ev.serviceInfoBase64) {
             const info = jsonFromB64<any>(ev.serviceInfoBase64);
-            name = info?.name ?? name;
-            platform = info?.platform ?? platform;
-            deviceId = info?.deviceId ?? deviceId;
+            name = info?.name || name;
+            platform = info?.platform || platform;
+            deviceId = info?.deviceId || deviceId;
           }
         } catch { }
 
@@ -89,8 +134,11 @@ export class DeviceDiscoveryService {
           id: deviceId,
           name,
           platform,
+          type: deviceType,
           is_online: true,
           last_seen: new Date(now).toISOString(),
+          modelName,
+          osVersion,
         });
 
         this.peers.set(peerId, {

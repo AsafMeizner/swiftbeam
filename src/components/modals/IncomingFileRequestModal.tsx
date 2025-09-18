@@ -51,7 +51,7 @@ const fileIcons: Record<string, LucideIcon> = {
 type Props = {
   request: IncomingFileRequest | null;
   isOpen: boolean;
-  onResponse: (response: FileRequestResponse, saveLocation?: string) => void;
+  onResponse: (response: FileRequestResponse) => void;
   onClose: () => void;
 };
 
@@ -91,7 +91,7 @@ export default function IncomingFileRequestModal({ request, isOpen, onResponse, 
   const handleResponse = async (response: FileRequestResponse) => {
     setIsResponding(true);
     try {
-      await onResponse(response, response === "accept" ? saveLocation : undefined);
+      await onResponse(response);
       if (response !== "pending") {
         onClose();
       }

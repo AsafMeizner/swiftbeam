@@ -2,11 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { 
-  getWiFiAwareBroadcastService, 
+  getWiFiAwareBroadcastService,
   IncomingFileRequest, 
   FileRequestResponse,
   BroadcastSettings
 } from "@/services/wifiAwareBroadcast";
+import { NativeFileTransferProgress, FileTransferResult } from "@/types";
 import IncomingFileRequestModal from "@/components/modals/IncomingFileRequestModal";
 
 interface WiFiAwareContextType {
@@ -18,14 +19,18 @@ interface WiFiAwareContextType {
   pendingRequests: IncomingFileRequest[];
   currentRequest: IncomingFileRequest | null;
   
+  // Transfers state
+  activeTransfers: NativeFileTransferProgress[];
+  
   // Actions
   startBroadcasting: () => Promise<boolean>;
   stopBroadcasting: () => Promise<boolean>;
   updateSettings: (settings: Partial<BroadcastSettings>) => Promise<void>;
-  respondToRequest: (requestId: string, response: FileRequestResponse, saveLocation?: string) => Promise<boolean>;
+  respondToRequest: (requestId: string, response: FileRequestResponse) => Promise<boolean>;
   dismissCurrentRequest: () => void;
   showRequest: (request: IncomingFileRequest) => void;
   clearAllRequests: () => void;
+  cancelTransfer: (transferId: string) => Promise<boolean>;
 }
 
 const WiFiAwareContext = createContext<WiFiAwareContextType | undefined>(undefined);
@@ -46,6 +51,7 @@ export function WiFiAwareProvider({ children }: Props) {
   });
   const [pendingRequests, setPendingRequests] = useState<IncomingFileRequest[]>([]);
   const [currentRequest, setCurrentRequest] = useState<IncomingFileRequest | null>(null);
+  const [activeTransfers, setActiveTransfers] = useState<NativeFileTransferProgress[]>([]);
   const [showModal, setShowModal] = useState(false);
 
   const broadcastService = getWiFiAwareBroadcastService();
@@ -55,6 +61,7 @@ export function WiFiAwareProvider({ children }: Props) {
     setIsBroadcasting(broadcastService.isBroadcasting());
     setSettings(broadcastService.getSettings());
     setPendingRequests(broadcastService.getPendingRequests());
+    setActiveTransfers(broadcastService.getAllTransfers());
 
     // Set up event listeners
     const handleBroadcastStatusChange = () => {
@@ -90,17 +97,60 @@ export function WiFiAwareProvider({ children }: Props) {
         }
       }
     };
+    
+    const handleTransferProgress = (progress: NativeFileTransferProgress) => {
+      // Update the active transfers list
+      setActiveTransfers(prev => {
+        const existing = prev.findIndex(t => t.transferId === progress.transferId);
+        if (existing >= 0) {
+          // Replace existing progress data
+          const newList = [...prev];
+          newList[existing] = progress;
+          return newList;
+        } else {
+          // Add new transfer
+          return [...prev, progress];
+        }
+      });
+    };
+    
+    const handleTransferCompleted = (result: FileTransferResult) => {
+      // Remove from active transfers
+      setActiveTransfers(prev => prev.filter(t => t.transferId !== result.transferId));
+      
+      // Add to history
+      try {
+        // Add to FileTransfer history
+        import("@/entities/FileTransfer").then(({ FileTransfer }) => {
+          FileTransfer.create({
+            filename: result.fileName,
+            file_size: 0, // We don't have this info in the completion event
+            file_type: "application/octet-stream", 
+            sender_device: "Remote Device",
+            recipient_device: "My Device",
+            transfer_status: "completed",
+            file_url: result.filePath
+          });
+        });
+      } catch (error) {
+        console.error("Failed to add transfer to history:", error);
+      }
+    };
 
     // Register callbacks
     broadcastService.onBroadcastStatusChange(handleBroadcastStatusChange);
     broadcastService.onIncomingRequest(handleIncomingRequest);
     broadcastService.onRequestResponse(handleRequestResponse);
+    broadcastService.onTransferProgress(handleTransferProgress);
+    broadcastService.onTransferCompleted(handleTransferCompleted);
 
     // Cleanup
     return () => {
       broadcastService.removeCallback(handleBroadcastStatusChange);
       broadcastService.removeIncomingRequestCallback(handleIncomingRequest);
       broadcastService.removeRequestResponseCallback(handleRequestResponse);
+      broadcastService.removeTransferProgressCallback(handleTransferProgress);
+      broadcastService.removeTransferCompletedCallback(handleTransferCompleted);
     };
   }, [broadcastService, currentRequest]);
 
@@ -127,10 +177,9 @@ export function WiFiAwareProvider({ children }: Props) {
 
   const respondToRequestAction = async (
     requestId: string, 
-    response: FileRequestResponse, 
-    saveLocation?: string
+    response: FileRequestResponse
   ): Promise<boolean> => {
-    const success = await broadcastService.respondToRequest(requestId, response, saveLocation);
+    const success = await broadcastService.respondToRequest(requestId, response);
     
     // If accepted, add to history
     if (success && response === "accept") {
@@ -192,19 +241,30 @@ export function WiFiAwareProvider({ children }: Props) {
     setShowModal(false);
     setCurrentRequest(null);
   };
+  
+  const cancelTransferAction = async (transferId: string): Promise<boolean> => {
+    const result = await broadcastService.cancelFileTransfer(transferId);
+    if (result) {
+      // Remove from active transfers immediately for responsive UI
+      setActiveTransfers(prev => prev.filter(t => t.transferId !== transferId));
+    }
+    return result;
+  };
 
   const contextValue: WiFiAwareContextType = {
     isBroadcasting,
     settings,
     pendingRequests,
     currentRequest,
+    activeTransfers,
     startBroadcasting: startBroadcastingAction,
     stopBroadcasting: stopBroadcastingAction,
     updateSettings: updateSettingsAction,
     respondToRequest: respondToRequestAction,
     dismissCurrentRequest,
     showRequest,
-    clearAllRequests
+    clearAllRequests,
+    cancelTransfer: cancelTransferAction
   };
 
   return (
@@ -215,9 +275,9 @@ export function WiFiAwareProvider({ children }: Props) {
       <IncomingFileRequestModal
         request={currentRequest}
         isOpen={showModal}
-        onResponse={async (response, saveLocation) => {
+        onResponse={async (response) => {
           if (currentRequest) {
-            await respondToRequestAction(currentRequest.id, response, saveLocation);
+            await respondToRequestAction(currentRequest.id, response);
           }
         }}
         onClose={dismissCurrentRequest}
@@ -244,6 +304,12 @@ export function useBroadcastStatus() {
 export function useIncomingRequests() {
   const { pendingRequests, currentRequest, respondToRequest, showRequest, clearAllRequests } = useWiFiAware();
   return { pendingRequests, currentRequest, respondToRequest, showRequest, clearAllRequests };
+}
+
+// Hook for file transfers
+export function useFileTransfers() {
+  const { activeTransfers, cancelTransfer } = useWiFiAware();
+  return { activeTransfers, cancelTransfer };
 }
 
 // Hook for settings only

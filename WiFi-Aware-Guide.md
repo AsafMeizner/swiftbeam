@@ -66,17 +66,26 @@ I've added a complete WiFi Aware broadcasting system that mimics AirDrop but wor
 
 ## 🏗️ **Technical Architecture**
 
+### **Native Plugin Layer**
+- `@asaf/wifi-aware` - Capacitor plugin for Wi-Fi Aware functionality
+- Full native implementation for iOS and Android
+- Support for file transfers, device info, and socket connections
+- Real-time distance measurement between devices
+
 ### **Services Layer**
+- `WifiAwareCore.ts` - TypeScript wrapper around the native plugin
 - `WiFiAwareBroadcastService` - Core broadcasting and request handling
+- `DeviceDiscoveryService` - Device discovery and management
+- `FileTransferService` - File transfer between devices
 - Singleton pattern for consistent state management
 - Event-driven architecture with callbacks
-- Mock implementation ready for real WiFi Aware APIs
 
 ### **React Context**
 - `WiFiAwareContext` - Global state management
 - Automatic modal handling for incoming requests
 - React hooks for easy component integration
 - Real-time status synchronization
+- File transfer progress tracking
 
 ### **UI Components**
 - `IncomingFileRequestModal` - Handles file request UI
@@ -87,39 +96,42 @@ I've added a complete WiFi Aware broadcasting system that mimics AirDrop but wor
 ## 🔄 **Integration Points**
 
 ### **Existing Services Enhanced**
-- Device discovery now supports WiFi Aware devices
-- File transfer service works with incoming requests
-- Settings system extended with WiFi Aware controls
+- Device discovery now supports Wi-Fi Aware devices with detailed device info
+- File transfer service uses native file transfer API for reliable transfers
+- Settings system extended with Wi-Fi Aware controls
+- Real-time progress tracking for file transfers
+- Native socket connections for direct device communication
 
-### **Future Real Implementation**
+### **Native WiFi Aware Implementation**
 
-When ready to implement real WiFi Aware:
+The Wi-Fi Aware functionality has been implemented with a native plugin:
 
-1. **iOS**: Replace mock with NearbyInteraction framework
-2. **Android**: Replace mock with WiFi Aware API
-3. **Windows**: Replace mock with WiFi Direct API  
-4. **macOS**: Replace mock with Multipeer Connectivity
+1. **iOS**: Uses Apple's Nearby Interaction framework combined with MultipeerConnectivity
+2. **Android**: Uses native Wi-Fi Aware APIs for device discovery and file transfer
+3. **Windows**: Falls back to WebRTC for web-based transfers
+4. **macOS**: Uses native MultipeerConnectivity APIs
 
-The service architecture is designed to make this transition seamless - just replace the mock functions with real networking calls.
+The services architecture has been seamlessly integrated with these native implementations through the `@asaf/wifi-aware` plugin.
 
-## 🎮 **Demo Commands**
+## � **Native Features**
 
-```javascript
-// Quick test - single file
-swiftbeamDev.simulateIncomingFile()
+### **Device Discovery**
+- Native Wi-Fi Aware device discovery
+- Real-time distance measurement between devices
+- Automatic service discovery and broadcasting
+- Device info retrieval (model, OS version, capabilities)
 
-// Stress test - 5 files over 5 seconds  
-swiftbeamDev.simulateBurst(5)
+### **File Transfer**
+- Direct device-to-device file transfer without internet
+- Progress tracking and cancellation support
+- Support for large files
+- Transfer history and status tracking
 
-// Large file test
-swiftbeamDev.simulateLargeFile()
-
-// Check current status
-swiftbeamDev.testBroadcasting()
-
-// Custom scenarios
-swiftbeamDev.createCustomRequest("Bob's Android", "document.pdf", 1.2, "Here's the file you requested")
-```
+### **Socket Connections**
+- Direct socket connections between devices
+- Support for multiple connected peers
+- Data streaming capabilities
+- Multicast support
 
 ## 📱 **Cross-Platform Experience**
 

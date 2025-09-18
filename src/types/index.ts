@@ -9,6 +9,11 @@ export interface DeviceData {
   last_seen: string;
   connection_status: "connected" | "connecting" | "disconnected" | "available";
   created_date: string;
+  // New fields from the WiFi Aware plugin DeviceInfo
+  modelName?: string;
+  osVersion?: string;
+  capabilities?: string[];
+  distanceMm?: number;
 }
 
 export interface FileTransferData {
@@ -52,6 +57,43 @@ export interface FileData {
   lastModified: number;
   file?: File;
   status: "ready" | "transferring" | "completed" | "failed";
+}
+
+export interface NativeFileTransferProgress {
+  peerId: string;
+  transferId: string;
+  fileName: string;
+  bytesTransferred: number;
+  totalBytes: number;
+  progress: number;
+  direction: 'incoming' | 'outgoing';
+  status: 'in-progress' | 'completed' | 'failed' | 'cancelled';
+}
+
+export interface FileTransferRequest {
+  peerId: string;
+  transferId: string;
+  fileName: string;
+  mimeType?: string;
+  fileSize: number;
+}
+
+export interface FileTransferResult {
+  peerId: string;
+  transferId: string;
+  fileName: string;
+  filePath?: string;
+  fileBase64?: string;
+}
+
+export interface SocketInfo {
+  socketId: string;
+  role: 'publisher' | 'subscriber';
+  localPort?: number;
+  peerIpv6?: string;
+  peerPort?: number;
+  multicastEnabled?: boolean;
+  connectedPeers?: string[];
 }
 
 export type TransferStatusType = "pending" | "transferring" | "completed" | "failed" | "cancelled";
