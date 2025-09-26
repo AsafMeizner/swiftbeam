@@ -132,13 +132,14 @@ export class FileTransferService {
           // Convert file to base64 if needed
           const fileBase64 = await this.fileToBase64(file.file);
           
-          // Send using the new native file transfer API
-          const transferId = await WifiAwareCore.sendFile({
+          // Send using the new sendFileTransfer API
+          const result = await WifiAwareCore.sendFileTransfer({
             peerId,
             fileBase64,
             fileName: file.name,
             mimeType: file.type
           });
+          const transferId = result.transferId;
 
           // Record the file transfer
           const transfer: FileTransferData = {

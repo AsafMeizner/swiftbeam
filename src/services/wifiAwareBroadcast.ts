@@ -251,8 +251,8 @@ export class WiFiAwareBroadcastService {
           try {
             // Convert the file to a base64 string
             const fileBase64 = await this.fileToBase64(file.file);
-            // Send the file using the native API
-            await WifiAwareCore.sendFile({
+            // Send the file using the new sendFileTransfer API
+            await WifiAwareCore.sendFileTransfer({
               peerId: toPeerId,
               fileBase64,
               fileName: file.name,

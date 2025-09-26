@@ -1,7 +1,14 @@
 'use client';
 
 import { Capacitor } from '@capacitor/core';
-import { WifiAware, type AttachResult, type DeviceInfo, type SocketResult, type FileTransferProgress } from '@asaf/wifi-aware';
+// Import our extended plugin definition
+import WifiAware from './wifiAwarePlugin';
+import { 
+    type AttachResult, 
+    type DeviceInfo, 
+    type SocketResult, 
+    type FileTransferProgress
+} from '@asaf/wifi-aware';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -122,7 +129,32 @@ export const WifiAwareCore = {
         multicast?: boolean;
         peerIds?: string[];
     }) {
-        return WifiAware.sendFile({
+        // Calling the new sendFileTransfer API that replaces sendFile
+        const result = await WifiAware.sendFileTransfer({
+            peerId: options.peerId,
+            filePath: options.filePath,
+            fileBase64: options.fileBase64,
+            fileName: options.fileName,
+            mimeType: options.mimeType || 'application/octet-stream',
+            multicast: options.multicast,
+            peerIds: options.peerIds
+        });
+        
+        // Return the transferId for backward compatibility
+        return result.transferId;
+    },
+    
+    async sendFileTransfer(options: {
+        peerId: string;
+        filePath?: string;
+        fileBase64?: string;
+        fileName: string;
+        mimeType?: string;
+        multicast?: boolean;
+        peerIds?: string[];
+    }) {
+        // Use the new API directly
+        return WifiAware.sendFileTransfer({
             peerId: options.peerId,
             filePath: options.filePath,
             fileBase64: options.fileBase64,
