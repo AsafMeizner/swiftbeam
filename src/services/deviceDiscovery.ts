@@ -3,7 +3,6 @@
 import { WifiAwareCore, jsonFromB64 } from '@/lib/wifiAwareCore';
 import { completeDeviceData } from '@/lib/deviceAdapters';
 import type { DeviceData } from '@/types';
-// Capacitor import removed as it's not needed
 
 // Internal shape (what we store), not exported
 type Peer = {
@@ -46,6 +45,19 @@ export class DeviceDiscoveryService {
     
     return 'android'; // Default fallback
   }
+  
+  private normalizeDevicePlatform(platform?: string): DeviceData['platform'] {
+    if (!platform) return 'android';
+    
+    const p = platform.toLowerCase();
+    if (p.includes('ios')) return 'ios';
+    if (p.includes('android')) return 'android';
+    if (p.includes('windows')) return 'windows';
+    if (p.includes('mac') || p.includes('osx')) return 'macos';
+    if (p.includes('linux')) return 'linux';
+    
+    return p as DeviceData['platform'];
+  }
 
   static getInstance() {
     if (!DeviceDiscoveryService.instance) {
@@ -80,17 +92,15 @@ export class DeviceDiscoveryService {
       .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
   }
 
-  async startScan(durationMs = 8000): Promise<DeviceData[]> {
-    if (!WifiAwareCore.isNative()) return [];
-    if (this.isScanning) return this.getActiveDevices();
+  private async cleanupDisposers() {
+    if (this.disposers.length > 0) {
+      // Remove all event listeners
+      await Promise.allSettled(this.disposers.map(d => d.remove()));
+      this.disposers = [];
+    }
+  }
 
-    this.isScanning = true; this.notify();
-
-    const ok = await WifiAwareCore.ensureAttached();
-    if (!ok) { this.isScanning = false; this.notify(); return []; }
-
-    await WifiAwareCore.subscribe();
-
+  private async setupEventHandlers() {
     // Found
     this.disposers.push(
       await WifiAwareCore.on('serviceFound', async (ev) => {
@@ -106,13 +116,30 @@ export class DeviceDiscoveryService {
         // First try to get device info from the native API
         try {
           if (WifiAwareCore.isNative()) {
+            console.log(`Attempting to get device info for peer ${peerId}`);
             const deviceInfo = await WifiAwareCore.getDeviceInfo(peerId);
+            console.log('Device info received:', JSON.stringify(deviceInfo));
+            
             if (deviceInfo) {
+              // Extract all available device information
               name = deviceInfo.deviceName || name;
-              deviceType = this.mapDeviceTypeString(deviceInfo.deviceType);
-              platform = this.mapDeviceTypeToPlatform(deviceInfo.deviceType) || platform;
+              
+              if (deviceInfo.deviceType) {
+                deviceType = this.mapDeviceTypeString(deviceInfo.deviceType);
+                platform = this.mapDeviceTypeToPlatform(deviceInfo.deviceType);
+                console.log(`Mapped device type: ${deviceType}, platform: ${platform}`);
+              }
+              
+              // Additional info for better display
               modelName = deviceInfo.modelName;
               osVersion = deviceInfo.osVersion;
+              
+              // Handle any custom properties that might be in the device info object
+              const deviceInfoAny = deviceInfo as any;
+              if (deviceInfoAny.platform) {
+                platform = this.normalizeDevicePlatform(deviceInfoAny.platform);
+                console.log(`Using direct platform info: ${platform}`);
+              }
             }
           }
         } catch (error) {
@@ -168,18 +195,89 @@ export class DeviceDiscoveryService {
         this.notify();
       })
     );
+  }
 
-    await new Promise(res => setTimeout(res, durationMs));
-    try { await WifiAwareCore.stopAll(); } catch { }
-    this.isScanning = false; this.notify();
+  async startScan(durationMs = 8000): Promise<DeviceData[]> {
+    if (!WifiAwareCore.isNative()) return [];
+    if (this.isScanning) return this.getActiveDevices();
 
+    // Clean up any previous disposers before starting new scan
+    await this.cleanupDisposers();
+    
+    this.isScanning = true; 
+    this.notify();
+    
+    // Clear old peers that haven't been updated recently
+    const now = Date.now();
+    const staleMs = 120_000; // 2 minutes
+    this.peers.forEach((peer, key) => {
+      if (now - peer.updatedAt > staleMs) {
+        this.peers.delete(key);
+      }
+    });
+
+    // Make multiple attempts to ensure discovery works
+    const maxAttempts = 3;
+    let attempt = 0;
+    let success = false;
+    
+    while (attempt < maxAttempts && !success) {
+      attempt++;
+      console.log(`WiFi Aware discovery attempt ${attempt}/${maxAttempts}`);
+      
+      try {
+        const result = await WifiAwareCore.ensureAttached();
+        if (!result.available) {
+          console.log(`WiFi Aware attach failed, retrying... (${result.reason || 'unknown reason'})`);
+          await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
+        
+        success = true;
+        
+        // Stop any previous subscriptions to ensure clean state
+        try { 
+          await WifiAwareCore.stopAll(); // This will stop subscription
+          await new Promise(r => setTimeout(r, 300)); // Give time to stop
+        } catch (e) { 
+          console.log("Error stopping previous subscription:", e);
+        }
+        
+        // Start a new subscription with enhanced parameters
+        await WifiAwareCore.subscribe();
+        
+        // Set up event handlers for discovery
+        await this.setupEventHandlers();
+        
+        break; // Exit the while loop as we've succeeded
+      } catch (error) {
+        console.error("Error during WiFi Aware discovery attempt:", error);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+    
+    // Wait for the scan duration regardless of success
+    await new Promise(resolve => setTimeout(resolve, durationMs));
+    
+    // Mark scanning as complete
+    this.isScanning = false;
+    this.notify();
+    
+    // Return discovered devices
     return this.getActiveDevices();
   }
 
-  isCurrentlyScanning() { return this.isScanning; }
+  isCurrentlyScanning(): boolean { 
+    return this.isScanning; 
+  }
 
-  onScanStatusChange(cb: () => void) { this.scanCallbacks.push(cb); }
-  removeScanStatusCallback(cb: () => void) { this.scanCallbacks = this.scanCallbacks.filter(f => f !== cb); }
+  onScanStatusChange(cb: () => void): void { 
+    this.scanCallbacks.push(cb); 
+  }
+  
+  removeScanStatusCallback(cb: () => void): void { 
+    this.scanCallbacks = this.scanCallbacks.filter(f => f !== cb); 
+  }
 
   async getDeviceStats() {
     const all = await this.getAllDevices();
@@ -189,13 +287,15 @@ export class DeviceDiscoveryService {
     return { total: all.length, online, offline: all.length - online, lastScanTime: this.isScanning ? undefined : new Date() };
   }
 
-  filterDevices(search: string, devices?: DeviceData[]) {
+  filterDevices(search: string, devices?: DeviceData[]): DeviceData[] {
     const source = devices ?? Array.from(this.peers.values()).map(p => p.data);
     if (!search.trim()) return source;
     return source.filter(d => d.name.toLowerCase().includes(search.toLowerCase()));
   }
 
-  private notify() { this.scanCallbacks.forEach(cb => { try { cb(); } catch { } }); }
+  private notify(): void { 
+    this.scanCallbacks.forEach(cb => { try { cb(); } catch { } }); 
+  }
 }
 
 export const getDeviceDiscoveryService = () => DeviceDiscoveryService.getInstance();

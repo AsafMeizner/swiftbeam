@@ -58,10 +58,22 @@ export function WiFiAwareProvider({ children }: Props) {
 
   useEffect(() => {
     // Initialize state from service
-    setIsBroadcasting(broadcastService.isBroadcasting());
-    setSettings(broadcastService.getSettings());
-    setPendingRequests(broadcastService.getPendingRequests());
-    setActiveTransfers(broadcastService.getAllTransfers());
+    const initializeState = async () => {
+      // Get current settings first
+      const currentSettings = broadcastService.getSettings();
+      setSettings(currentSettings);
+      
+      // Ensure broadcasting state matches the settings
+      if (currentSettings.enabled && !broadcastService.isBroadcasting()) {
+        await broadcastService.startBroadcasting();
+      }
+      
+      setIsBroadcasting(broadcastService.isBroadcasting());
+      setPendingRequests(broadcastService.getPendingRequests());
+      setActiveTransfers(broadcastService.getAllTransfers());
+    };
+    
+    initializeState();
 
     // Set up event listeners
     const handleBroadcastStatusChange = () => {

@@ -51,7 +51,16 @@ export class WiFiAwareBroadcastService {
   private disposers: Array<{ remove: () => Promise<void> }> = [];
   private myDeviceId = crypto.randomUUID();
 
-  private constructor() { this.loadSettings(); }
+  private constructor() { 
+    this.loadSettings(); 
+    // Auto-restore broadcast state if it was enabled before
+    if (typeof window !== 'undefined') {
+      if (this.settings.enabled) {
+        // Use setTimeout to ensure this runs after construction
+        setTimeout(() => this.startBroadcasting(), 500);
+      }
+    }
+  }
 
   static getInstance() {
     if (!WiFiAwareBroadcastService.instance) {
@@ -79,7 +88,13 @@ export class WiFiAwareBroadcastService {
         let msg: any;
         try { msg = jsonFromB64<any>(m.dataBase64); } catch { return; }
 
-        if (msg?.type === 'file-request') {
+        if (msg?.type === 'file-transfer-intent') {
+          // This is just a notification that a transfer will be initiated
+          // We don't need to do anything here as the fileTransferRequest event will
+          // be triggered by the native API when the actual transfer starts
+          console.log("File transfer intent received:", msg.fileName);
+          
+        } else if (msg?.type === 'file-request') {
           const reqId = crypto.randomUUID();
           const now = new Date();
           const sender = completeDeviceData({
@@ -251,7 +266,21 @@ export class WiFiAwareBroadcastService {
           try {
             // Convert the file to a base64 string
             const fileBase64 = await this.fileToBase64(file.file);
-            // Send the file using the new sendFileTransfer API
+            
+            // First send a message to the peer indicating a transfer is coming
+            // This helps ensure the modal appears on the correct device
+            await WifiAwareCore.sendMessage(toPeerId, {
+              type: 'file-transfer-intent',
+              fileName: file.name,
+              fileSize: file.size,
+              fileSender: sender,
+              timestamp: Date.now()
+            });
+            
+            // Give a short delay for the intent message to be processed
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Now send the file using the new sendFileTransfer API
             await WifiAwareCore.sendFileTransfer({
               peerId: toPeerId,
               fileBase64,
@@ -287,8 +316,25 @@ export class WiFiAwareBroadcastService {
     // If using native API, we need to handle file transfer responses
     if (response === 'accept') {
       try {
-        // No need to handle save path here as the WifiAwareCore will handle it automatically
-        // We're just accepting the transfer by sending a confirmation message
+        // Create a placeholder progress entry to track this transfer
+        const initialProgress: NativeFileTransferProgress = {
+          transferId: requestId,
+          peerId: req.senderDevice.id,
+          fileName: req.files[0]?.name || 'Unknown file',
+          bytesTransferred: 0,
+          totalBytes: req.files[0]?.size || 0,
+          progress: 0,
+          status: 'in-progress',
+          direction: 'incoming'
+        };
+        
+        // Add to active transfers to show progress UI
+        this.activeTransfers.set(requestId, initialProgress);
+        this.transferProgressCallbacks.forEach(cb => { 
+          try { cb(initialProgress); } catch { } 
+        });
+        
+        // Let the sender know we accepted
         await WifiAwareCore.sendMessage(req.senderDevice.id, {
           type: 'file-accept',
           requestId,
@@ -297,13 +343,17 @@ export class WiFiAwareBroadcastService {
       } catch (error) {
         console.error('Error accepting file transfer:', error);
       }
-      } else if (response === 'decline') {
+    } else if (response === 'decline') {
       try {
         await WifiAwareCore.cancelFileTransfer(requestId);
       } catch (error) {
         console.error('Error declining file transfer:', error);
       }
-    }    if (response !== 'pending') this.incomingRequests.delete(requestId);
+    }
+    
+    if (response !== 'pending') {
+      this.incomingRequests.delete(requestId);
+    }
     return true;
   }
 

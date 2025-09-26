@@ -1,333 +1,260 @@
-/**
- * The TypeScript code provides development utilities and console commands for testing WiFi Aware
- * functionality, including simulating incoming files, testing broadcasting, and creating custom file
- * requests.
- * @returns The code snippet is returning an object `swiftbeamDev` that contains various functions and
- * data for simulating file transfers and testing WiFi Aware functionality. This object is attached to
- * the `window` object in a development environment, allowing developers to access and call these
- * functions directly from the browser console.
- */
-// /**
-//  * Development utilities and console commands for testing WiFi Aware functionality
-//  * 
-//  * To use these commands, open the browser console and call the functions directly:
-//  * - window.swiftbeamDev.simulateIncomingFile()
-//  * - window.swiftbeamDev.simulateMultipleFiles()
-//  * - window.swiftbeamDev.testBroadcasting()
-//  */
+'use client';
 
-// import { simulateIncomingFileRequest } from "@/services/wifiAwareBroadcast";
-// import { DeviceData, FileData } from "@/types";
+import { WifiAwareCore } from '@/lib/wifiAwareCore';
 
-// // Mock device data for testing
-// const mockSenderDevices: DeviceData[] = [
-//   {
-//     id: "test-device-1",
-//     name: "Alice's iPhone",
-//     type: "phone",
-//     platform: "ios",
-//     is_online: true,
-//     last_seen: new Date().toISOString(),
-//     connection_status: "available",
-//     created_date: new Date().toISOString()
-//   },
-//   {
-//     id: "test-device-2", 
-//     name: "Bob's Laptop",
-//     type: "laptop",
-//     platform: "windows",
-//     is_online: true,
-//     last_seen: new Date().toISOString(),
-//     connection_status: "available",
-//     created_date: new Date().toISOString()
-//   },
-//   {
-//     id: "test-device-3",
-//     name: "Carol's Android",
-//     type: "phone", 
-//     platform: "android",
-//     is_online: true,
-//     last_seen: new Date().toISOString(),
-//     connection_status: "available",
-//     created_date: new Date().toISOString()
-//   }
-// ];
+export type LogLevel = 'debug' | 'info' | 'warning' | 'error';
+export type LogSource = 'api' | 'event' | 'app' | 'plugin';
 
-// // Mock file data for testing
-// const mockFiles: FileData[] = [
-//   {
-//     id: "file-1",
-//     name: "vacation-photo.jpg",
-//     size: 2.5 * 1024 * 1024, // 2.5 MB
-//     type: "image/jpeg",
-//     lastModified: Date.now(),
-//     status: "ready"
-//   },
-//   {
-//     id: "file-2",
-//     name: "presentation.pdf",
-//     size: 1.2 * 1024 * 1024, // 1.2 MB
-//     type: "application/pdf", 
-//     lastModified: Date.now(),
-//     status: "ready"
-//   },
-//   {
-//     id: "file-3",
-//     name: "demo-video.mp4",
-//     size: 15 * 1024 * 1024, // 15 MB
-//     type: "video/mp4",
-//     lastModified: Date.now(),
-//     status: "ready"
-//   },
-//   {
-//     id: "file-4",
-//     name: "song.mp3",
-//     size: 4 * 1024 * 1024, // 4 MB
-//     type: "audio/mpeg",
-//     lastModified: Date.now(),
-//     status: "ready"
-//   },
-//   {
-//     id: "file-5",
-//     name: "project-files.zip",
-//     size: 25 * 1024 * 1024, // 25 MB
-//     type: "application/zip",
-//     lastModified: Date.now(),
-//     status: "ready"
-//   }
-// ];
+export interface LogEntry {
+  id: string;
+  timestamp: Date;
+  level: LogLevel;
+  source: LogSource;
+  message: string;
+  data?: any;
+  tag?: string;
+}
 
-// const messages = [
-//   "Hey, sharing some photos from the trip!",
-//   "Here's the document you requested",
-//   "Check out this cool video I found",
-//   "Can you review this presentation?",
-//   "",
-//   "Thanks for your help earlier ❤️",
-//   "Quick file share"
-// ];
+// Maximum number of log entries to keep
+const MAX_LOG_ENTRIES = 1000;
 
-// /**
-//  * Simulate receiving a single file from a random device
-//  */
-// function simulateIncomingFile(): string {
-//   const randomDevice = mockSenderDevices[Math.floor(Math.random() * mockSenderDevices.length)];
-//   const randomFile = mockFiles[Math.floor(Math.random() * mockFiles.length)];
-//   const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+class DevConsole {
+  private static instance: DevConsole;
+  private logs: LogEntry[] = [];
+  private subscribers: Array<(logs: LogEntry[]) => void> = [];
+  private initialized = false;
+  private rawEvents: Record<string, any[]> = {};
 
-//   console.log(`🔄 Simulating incoming file from ${randomDevice.name}...`);
-  
-//   const requestId = simulateIncomingFileRequest(
-//     randomDevice,
-//     [randomFile],
-//     randomMessage || undefined
-//   );
+  private constructor() {}
 
-//   console.log(`✅ Simulated file request created with ID: ${requestId}`);
-//   console.log(`📱 From: ${randomDevice.name} (${randomDevice.platform})`);
-//   console.log(`📄 File: ${randomFile.name} (${(randomFile.size / 1024 / 1024).toFixed(1)} MB)`);
-//   if (randomMessage) {
-//     console.log(`💬 Message: "${randomMessage}"`);
-//   }
+  static getInstance(): DevConsole {
+    if (!DevConsole.instance) {
+      DevConsole.instance = new DevConsole();
+    }
+    return DevConsole.instance;
+  }
 
-//   return requestId;
-// }
-
-// /**
-//  * Simulate receiving multiple files from a device
-//  */
-// function simulateMultipleFiles(fileCount: number = 3): string {
-//   const randomDevice = mockSenderDevices[Math.floor(Math.random() * mockSenderDevices.length)];
-//   const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-  
-//   // Select random files
-//   const shuffledFiles = [...mockFiles].sort(() => Math.random() - 0.5);
-//   const selectedFiles = shuffledFiles.slice(0, Math.min(fileCount, mockFiles.length));
-
-//   console.log(`🔄 Simulating ${fileCount} files from ${randomDevice.name}...`);
-  
-//   const requestId = simulateIncomingFileRequest(
-//     randomDevice,
-//     selectedFiles,
-//     randomMessage || undefined
-//   );
-
-//   console.log(`✅ Simulated multi-file request created with ID: ${requestId}`);
-//   console.log(`📱 From: ${randomDevice.name} (${randomDevice.platform})`);
-//   console.log(`📄 Files (${selectedFiles.length}):`);
-//   selectedFiles.forEach(file => {
-//     console.log(`   - ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
-//   });
-//   if (randomMessage) {
-//     console.log(`💬 Message: "${randomMessage}"`);
-//   }
-
-//   return requestId;
-// }
-
-// /**
-//  * Simulate a large file transfer request
-//  */
-// function simulateLargeFile(): string {
-//   const randomDevice = mockSenderDevices[Math.floor(Math.random() * mockSenderDevices.length)];
-  
-//   const largeFile: FileData = {
-//     id: "large-file-test",
-//     name: "4K-movie.mkv", 
-//     size: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
-//     type: "video/x-matroska",
-//     lastModified: Date.now(),
-//     status: "ready"
-//   };
-
-//   console.log(`🔄 Simulating large file from ${randomDevice.name}...`);
-  
-//   const requestId = simulateIncomingFileRequest(
-//     randomDevice,
-//     [largeFile],
-//     "This is a large file, it might take a while to transfer"
-//   );
-
-//   console.log(`✅ Simulated large file request created with ID: ${requestId}`);
-//   console.log(`📱 From: ${randomDevice.name}`);
-//   console.log(`📄 File: ${largeFile.name} (${(largeFile.size / 1024 / 1024 / 1024).toFixed(1)} GB)`);
-//   console.log(`⚠️  Large file warning will be shown to user`);
-
-//   return requestId;
-// }
-
-// /**
-//  * Test broadcasting functionality
-//  */
-// async function testBroadcasting(): Promise<void> {
-//   console.log("🔄 Testing broadcasting functionality...");
-  
-//   try {
-//     const { getWiFiAwareBroadcastService } = await import("@/services/wifiAwareBroadcast");
-//     const service = getWiFiAwareBroadcastService();
+  /**
+   * Initialize the DevConsole by attaching to WifiAwareCore events
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
     
-//     console.log(`📡 Current broadcast status: ${service.isBroadcasting() ? "Active" : "Inactive"}`);
-//     console.log(`⚙️  Settings:`, service.getSettings());
-//     console.log(`👁️  Visibility: ${service.getVisibilityStatus()}`);
-//     console.log(`📥 Can receive files: ${service.canReceiveFiles()}`);
-//     console.log(`📋 Pending requests: ${service.getPendingRequests().length}`);
+    this.initialized = true;
     
-//     if (!service.isBroadcasting()) {
-//       console.log("💡 Tip: Enable WiFi Aware in Settings to start broadcasting");
-//     }
-//   } catch (error) {
-//     console.error("❌ Error testing broadcasting:", error);
-//   }
-// }
-
-// /**
-//  * Simulate a burst of incoming requests (stress test)
-//  */
-// function simulateBurst(count: number = 5): string[] {
-//   console.log(`🔄 Simulating burst of ${count} file requests...`);
+    // Define all event types we want to monitor
+    const eventTypes = [
+      'stateChanged',
+      'serviceFound',
+      'serviceLost',
+      'messageReceived',
+      'socketReady',
+      'socketClosed',
+      'peerConnected',
+      'peerDisconnected',
+      'fileTransferRequest',
+      'fileTransferProgress',
+      'fileTransferCompleted'
+    ];
+    
+    // Set up event listeners for each event type
+    for (const eventType of eventTypes) {
+      // Keep track of raw events for each type
+      if (!this.rawEvents[eventType]) {
+        this.rawEvents[eventType] = [];
+      }
+      
+      try {
+        await WifiAwareCore.on(eventType as any, (data: any) => {
+          // Store the raw event data
+          const maxEventsPerType = 50;
+          this.rawEvents[eventType].unshift(data);
+          
+          // Cap the number of events stored per type
+          if (this.rawEvents[eventType].length > maxEventsPerType) {
+            this.rawEvents[eventType] = this.rawEvents[eventType].slice(0, maxEventsPerType);
+          }
+          
+          // Create a log entry for this event
+          this.log('info', 'event', `${eventType}`, data, eventType);
+        });
+        
+        this.log('debug', 'app', `Attached to ${eventType} events`);
+      } catch (error) {
+        this.log('error', 'app', `Failed to attach to ${eventType} events`, { error });
+      }
+    }
+    
+    // Monkey patch the core methods to log their inputs/outputs
+    this.monkeyPatchCoreMethod('ensureAttached');
+    this.monkeyPatchCoreMethod('getDeviceInfo');
+    this.monkeyPatchCoreMethod('publish');
+    this.monkeyPatchCoreMethod('subscribe');
+    this.monkeyPatchCoreMethod('stopAll');
+    this.monkeyPatchCoreMethod('sendMessage');
+    this.monkeyPatchCoreMethod('sendFile');
+    this.monkeyPatchCoreMethod('sendFileTransfer');
+    this.monkeyPatchCoreMethod('cancelFileTransfer');
+    this.monkeyPatchCoreMethod('startSocket');
+    this.monkeyPatchCoreMethod('stopSocket');
+    
+    this.log('info', 'app', 'DevConsole initialized');
+  }
   
-//   const requestIds: string[] = [];
+  /**
+   * Monkey patch a WifiAwareCore method to log its inputs and outputs
+   */
+  private monkeyPatchCoreMethod(methodName: string): void {
+    const originalMethod = (WifiAwareCore as any)[methodName];
+    if (typeof originalMethod !== 'function') return;
+    
+    (WifiAwareCore as any)[methodName] = async (...args: any[]) => {
+      const inputTime = new Date();
+      this.log('debug', 'api', `${methodName} called`, { args }, 'input');
+      
+      try {
+        const result = await originalMethod.apply(WifiAwareCore, args);
+        
+        // Calculate response time
+        const responseTime = new Date().getTime() - inputTime.getTime();
+        
+        this.log('debug', 'api', `${methodName} returned after ${responseTime}ms`, { result }, 'output');
+        return result;
+      } catch (error) {
+        this.log('error', 'api', `${methodName} failed`, { error, args }, 'error');
+        throw error;
+      }
+    };
+  }
   
-//   for (let i = 0; i < count; i++) {
-//     setTimeout(() => {
-//       const requestId = simulateIncomingFile();
-//       requestIds.push(requestId);
-//       console.log(`📨 Request ${i + 1}/${count} sent (ID: ${requestId})`);
-//     }, i * 1000); // 1 second between each request
-//   }
+  /**
+   * Get the current broadcast payload if available
+   */
+  getBroadcastPayload(): any {
+    // Extract the payload from the publish method calls
+    const publishEvents = this.logs.filter(
+      log => log.source === 'api' && log.message === 'publish called'
+    );
+    
+    if (publishEvents.length > 0) {
+      return publishEvents[0].data?.args?.[0] || null;
+    }
+    
+    return null;
+  }
   
-//   console.log(`✅ Scheduled ${count} requests to be sent over ${count} seconds`);
-//   return requestIds;
-// }
+  /**
+   * Get raw plugin events by type
+   */
+  getRawEvents(eventType?: string): Record<string, any[]> {
+    if (eventType) {
+      return { [eventType]: this.rawEvents[eventType] || [] };
+    }
+    return this.rawEvents;
+  }
 
-// /**
-//  * Create a mock file request with custom parameters
-//  */
-// function createCustomRequest(
-//   deviceName: string = "Custom Device",
-//   fileName: string = "custom-file.txt",
-//   fileSizeMB: number = 1,
-//   message?: string
-// ): string {
-//   const customDevice: DeviceData = {
-//     id: "custom-device",
-//     name: deviceName,
-//     type: "unknown",
-//     platform: "web",
-//     is_online: true,
-//     last_seen: new Date().toISOString(),
-//     connection_status: "available", 
-//     created_date: new Date().toISOString()
-//   };
+  /**
+   * Add a log entry
+   */
+  log(level: LogLevel, source: LogSource, message: string, data?: any, tag?: string): LogEntry {
+    const entry: LogEntry = {
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+      level,
+      source,
+      message,
+      data,
+      tag,
+    };
 
-//   const customFile: FileData = {
-//     id: "custom-file",
-//     name: fileName,
-//     size: fileSizeMB * 1024 * 1024,
-//     type: "text/plain",
-//     lastModified: Date.now(),
-//     status: "ready"
-//   };
+    this.logs.unshift(entry);
 
-//   console.log(`🔄 Creating custom file request...`);
-  
-//   const requestId = simulateIncomingFileRequest(
-//     customDevice,
-//     [customFile],
-//     message
-//   );
+    // Limit the number of logs
+    if (this.logs.length > MAX_LOG_ENTRIES) {
+      this.logs = this.logs.slice(0, MAX_LOG_ENTRIES);
+    }
 
-//   console.log(`✅ Custom request created with ID: ${requestId}`);
-//   return requestId;
-// }
+    // Notify subscribers
+    this.notifySubscribers();
 
-// /**
-//  * Get help for available dev commands
-//  */
-// function help(): void {
-//   console.log(`
-// 🛠️  SwiftBeam Development Console Commands:
+    return entry;
+  }
 
-// 📥 File Request Simulation:
-//    simulateIncomingFile()                    - Single random file
-//    simulateMultipleFiles(count?)             - Multiple files (default: 3)
-//    simulateLargeFile()                       - Large file (1.5GB) 
-//    simulateBurst(count?)                     - Multiple requests over time
-//    createCustomRequest(device, file, size, msg) - Custom request
+  /**
+   * Get all logs
+   */
+  getLogs(): LogEntry[] {
+    return [...this.logs];
+  }
 
-// 📡 Broadcasting:
-//    testBroadcasting()                        - Test broadcast functionality
+  /**
+   * Clear all logs
+   */
+  clearLogs(): void {
+    this.logs = [];
+    this.notifySubscribers();
+  }
 
-// 💡 Usage Examples:
-//    swiftbeamDev.simulateIncomingFile()
-//    swiftbeamDev.simulateMultipleFiles(5)
-//    swiftbeamDev.createCustomRequest("John's MacBook", "report.pdf", 2.5, "Here's the report!")
-//    swiftbeamDev.help()
+  /**
+   * Subscribe to log updates
+   */
+  subscribe(callback: (logs: LogEntry[]) => void): () => void {
+    this.subscribers.push(callback);
 
-// Note: Make sure WiFi Aware is enabled in Settings to see the incoming file modal!
-//   `);
-// }
+    // Return unsubscribe function
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
+  }
 
-// // Create the dev object to attach to window
-// const swiftbeamDev = {
-//   simulateIncomingFile,
-//   simulateMultipleFiles,
-//   simulateLargeFile,
-//   testBroadcasting,
-//   simulateBurst,
-//   createCustomRequest,
-//   help,
-  
-//   // Direct access to mock data for custom scenarios
-//   mockDevices: mockSenderDevices,
-//   mockFiles: mockFiles,
-//   messages: messages
-// };
+  /**
+   * Notify all subscribers
+   */
+  private notifySubscribers(): void {
+    const logs = this.getLogs();
+    this.subscribers.forEach(callback => {
+      try {
+        callback(logs);
+      } catch (error) {
+        console.error('Error in log subscriber:', error);
+      }
+    });
+  }
+}
 
-// // Attach to window in development
-// if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-//   (window as typeof window & { swiftbeamDev: typeof swiftbeamDev }).swiftbeamDev = swiftbeamDev;
-//   console.log("🛠️  SwiftBeam Dev Tools loaded! Type 'swiftbeamDev.help()' for available commands.");
-// }
+export const devConsole = DevConsole.getInstance();
 
-// export default swiftbeamDev;
+// React hook for using logs in components
+export function useLogs() {
+  const [logs, setLogs] = React.useState<LogEntry[]>(devConsole.getLogs());
+
+  React.useEffect(() => {
+    // Subscribe to log updates
+    const unsubscribe = devConsole.subscribe(setLogs);
+    
+    // Initialize the console if needed
+    devConsole.initialize().catch(console.error);
+    
+    return unsubscribe;
+  }, []);
+
+  return {
+    logs,
+    clearLogs: () => devConsole.clearLogs(),
+    log: (level: LogLevel, source: LogSource, message: string, data?: any, tag?: string) =>
+      devConsole.log(level, source, message, data, tag),
+    getBroadcastPayload: () => devConsole.getBroadcastPayload(),
+    getRawEvents: (eventType?: string) => devConsole.getRawEvents(eventType)
+  };
+}
+
+// Initialize the DevConsole immediately if window is defined
+if (typeof window !== 'undefined') {
+  // Delay initialization to ensure React app is loaded first
+  setTimeout(() => {
+    devConsole.initialize().catch(console.error);
+  }, 1000);
+}
+
+// Helper function to explicitly import React in client components
+import React from 'react';

@@ -9,6 +9,7 @@ import type { DeviceData, FileData, FileTransferData } from '@/types';
 export type TransferStatus = 'pending' | 'transferring' | 'completed' | 'failed' | 'cancelled';
 export interface TransferProgress {
   fileId: string; fileName: string; status: TransferStatus; progress: number;
+  transferId?: string; // Native transfer ID to link with WifiAware progress
   speed?: number; estimatedTimeRemaining?: number; error?: string;
 }
 export interface TransferResult { success: boolean; transfers: FileTransferData[]; errors: string[]; }
@@ -140,6 +141,9 @@ export class FileTransferService {
             mimeType: file.type
           });
           const transferId = result.transferId;
+          
+          // Link file ID to transfer ID so we can track progress
+          prog.transferId = transferId;
 
           // Record the file transfer
           const transfer: FileTransferData = {
@@ -158,6 +162,31 @@ export class FileTransferService {
           // Add to history
           try {
             await FileTransfer.create(transfer);
+            
+            // Set up a progress listener for this specific transfer
+            const progressListener = (p: any) => {
+              if (p.transferId === transferId) {
+                const updatedProg = this.activeTransfers.get(file.id);
+                if (updatedProg) {
+                  updatedProg.progress = p.progress || 0;
+                  updatedProg.speed = p.bytesTransferred / (p.elapsedTime || 1) * 1000;
+                  
+                  if (p.status === 'completed') {
+                    updatedProg.status = 'completed';
+                  } else if (p.status === 'failed') {
+                    updatedProg.status = 'failed';
+                    updatedProg.error = p.errorMessage || 'Transfer failed';
+                  } else if (p.status === 'cancelled') {
+                    updatedProg.status = 'cancelled';
+                  }
+                  
+                  options?.onProgress?.(updatedProg);
+                }
+              }
+            };
+            
+            WifiAwareCore.on('fileTransferProgress', progressListener);
+            
           } catch (error) {
             console.error('Failed to add transfer to history:', error);
           }

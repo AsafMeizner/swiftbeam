@@ -24,7 +24,8 @@ import {
   Settings,
   History,
   Share,
-  Download
+  Download,
+  Code
 } from "lucide-react";
 import { createPageUrl } from "@/utils/createPageUrl";
 import { useIncomingRequests, useBroadcastSettings, useBroadcastStatus } from "@/contexts/WiFiAwareContext";
@@ -35,6 +36,7 @@ const navigationItems = [
   { title: "Share Files", url: createPageUrl("Share"), icon: Share, description: "Send files instantly" },
   { title: "History", url: createPageUrl("History"), icon: History, description: "Transfer records" },
   { title: "Settings", url: createPageUrl("Settings"), icon: Settings, description: "App preferences" },
+  { title: "Dev Tools", url: createPageUrl("Dev"), icon: Code, description: "Plugin debugging" },
 ];
 
 export function AppSidebar() {

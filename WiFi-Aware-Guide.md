@@ -26,6 +26,10 @@ I've added a complete WiFi Aware broadcasting system that mimics AirDrop but wor
 - **Device naming** - Customize how your device appears to others
 
 ### 🛠️ **Developer Tools**
+- **Dedicated Dev Page** with comprehensive debugging tools
+- **Live Log Viewer** for monitoring all plugin activity
+- **Method Testing UI** to directly invoke plugin methods
+- **Raw Event Inspector** to see exactly what's being broadcast
 - **Console commands** for testing incoming file requests
 - **Mock data** for various file types and device combinations
 - **Stress testing** with burst requests
@@ -41,6 +45,15 @@ I've added a complete WiFi Aware broadcasting system that mimics AirDrop but wor
 5. Configure auto-accept and file size limits
 
 ### **Test Incoming File Requests**
+
+#### Using Dev Tools Page
+1. Navigate to the "Dev Tools" page in the sidebar
+2. Go to the "API Methods" tab
+3. Find the appropriate method to test (e.g., sendFileTransfer)
+4. Fill in the parameters and click "Execute"
+5. Monitor the results and any triggered events
+
+#### Using Console Commands
 1. Open browser console (F12)
 2. Type `swiftbeamDev.help()` to see all commands
 3. Try these commands:

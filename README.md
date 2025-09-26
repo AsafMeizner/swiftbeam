@@ -142,6 +142,11 @@ swiftbeam/
 ├── public/             # Static assets
 ├── src/
 │   ├── app/            # Next.js app router pages
+│   │   ├── dev/        # Developer debugging tools 
+│   │   ├── discovery/  # Device discovery page
+│   │   ├── history/    # Transfer history page
+│   │   ├── settings/   # App settings page
+│   │   └── share/      # File sharing page
 │   ├── components/     # React components
 │   ├── contexts/       # React context providers
 │   ├── entities/       # Data models
@@ -160,6 +165,27 @@ swiftbeam/
 - **WiFiAwareBroadcastService**: Manages broadcasting and file transfer requests
 - **DeviceDiscoveryService**: Handles device discovery and management
 - **FileTransferService**: Manages file transfers between devices
+
+### Developer Tools
+
+SwiftBeam includes a dedicated developer tools page accessible from the navigation sidebar. This page provides:
+
+- **Live Log Viewer**: Real-time monitoring of all WiFi Aware events and API calls
+- **Method Testing**: Directly invoke WiFi Aware API methods with custom parameters
+- **Raw Event Viewer**: Inspect the raw event data received from the plugin
+- **Broadcast Payload Inspector**: View the exact data being broadcast by the plugin
+
+To access the developer tools:
+
+1. Navigate to the "Dev Tools" page in the sidebar
+2. Use the tabs to switch between different debugging views
+3. Monitor events in real-time as you interact with the app
+
+For troubleshooting installation issues, such as npm script execution errors, you may need to adjust PowerShell execution policy:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
 ### Wi-Fi Aware Plugin API
 
